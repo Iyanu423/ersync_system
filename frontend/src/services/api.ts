@@ -6,6 +6,7 @@ import type {
   GovernorStatistics,
   AuditEvent,
   OneClickDemoResult,
+  AppNotification,
   UserRole
 } from '../types';
 
@@ -29,6 +30,16 @@ export class ApiService {
     };
   }
 
+  /** Builds an Error carrying the server's `detail` message (e.g. "No free emergency bed...") instead of a generic one. */
+  private static async errorFrom(res: Response, fallback: string): Promise<Error> {
+    try {
+      const body = await res.json();
+      const detail = typeof body?.detail === 'string' ? body.detail : null;
+      if (detail) return new Error(detail);
+    } catch { /* body wasn't JSON */ }
+    return new Error(`${fallback} (HTTP ${res.status})`);
+  }
+
   // Health
   static async getHealth() {
     const res = await fetch(`${API_BASE}/health`);
@@ -38,13 +49,13 @@ export class ApiService {
   // Hospitals
   static async getHospitals(): Promise<Hospital[]> {
     const res = await fetch(`${API_BASE}/hospitals`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch hospitals');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch hospitals');
     return res.json();
   }
 
   static async getHospital(id: string): Promise<Hospital> {
     const res = await fetch(`${API_BASE}/hospitals/${id}`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch hospital');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch hospital');
     return res.json();
   }
 
@@ -54,7 +65,7 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ emergency_status, accepting_emergencies })
     });
-    if (!res.ok) throw new Error('Failed to update hospital status');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to update hospital status');
     return res.json();
   }
 
@@ -64,7 +75,17 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ overall_capacity })
     });
-    if (!res.ok) throw new Error('Failed to update capacity');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to update capacity');
+    return res.json();
+  }
+
+  static async updateHospitalBeds(id: string, total_beds: number, available_beds: number): Promise<Hospital> {
+    const res = await fetch(`${API_BASE}/hospitals/${id}/beds`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ total_beds, available_beds })
+    });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to update beds');
     return res.json();
   }
 
@@ -74,7 +95,7 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ specialty_name, available_count, status })
     });
-    if (!res.ok) throw new Error('Failed to update specialist');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to update specialist');
     return res.json();
   }
 
@@ -84,7 +105,7 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ facility_name, available, status })
     });
-    if (!res.ok) throw new Error('Failed to update facility');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to update facility');
     return res.json();
   }
 
@@ -107,13 +128,13 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error('Failed to create emergency');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to create emergency');
     return res.json();
   }
 
   static async getEmergency(id: string): Promise<Emergency> {
     const res = await fetch(`${API_BASE}/emergencies/${id}`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch emergency');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch emergency');
     return res.json();
   }
 
@@ -122,27 +143,55 @@ export class ApiService {
       method: 'POST',
       headers: this.getHeaders()
     });
-    if (!res.ok) throw new Error('Failed to match emergency');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to match emergency');
     return res.json();
   }
 
   static async getMatches(id: string) {
     const res = await fetch(`${API_BASE}/emergencies/${id}/matches`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch matches');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch matches');
+    return res.json();
+  }
+
+  static async redispatchEmergency(id: string) {
+    const res = await fetch(`${API_BASE}/emergencies/${id}/dispatch`, { method: 'POST', headers: this.getHeaders() });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to re-dispatch emergency');
+    return res.json();
+  }
+
+  static async markArrived(id: string) {
+    const res = await fetch(`${API_BASE}/emergencies/${id}/arrived`, { method: 'POST', headers: this.getHeaders() });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to mark patient arrived');
+    return res.json();
+  }
+
+  static async closeCase(id: string) {
+    const res = await fetch(`${API_BASE}/emergencies/${id}/close`, { method: 'POST', headers: this.getHeaders() });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to close case');
+    return res.json();
+  }
+
+  static async getNotifications(limit: number = 15): Promise<AppNotification[]> {
+    const res = await fetch(`${API_BASE}/notifications?limit=${limit}`, { headers: this.getHeaders() });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch notifications');
     return res.json();
   }
 
   // Referrals
-  static async getReferrals(statusFilter?: string): Promise<Referral[]> {
-    const url = statusFilter ? `${API_BASE}/referrals?status_filter=${statusFilter}` : `${API_BASE}/referrals`;
+  static async getReferrals(statusFilter?: string, hospitalId?: string): Promise<Referral[]> {
+    const params = new URLSearchParams();
+    if (statusFilter) params.set('status_filter', statusFilter);
+    if (hospitalId) params.set('hospital_id', hospitalId);
+    const qs = params.toString();
+    const url = qs ? `${API_BASE}/referrals?${qs}` : `${API_BASE}/referrals`;
     const res = await fetch(url, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch referrals');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch referrals');
     return res.json();
   }
 
   static async getReferral(id: string): Promise<Referral> {
     const res = await fetch(`${API_BASE}/referrals/${id}`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch referral');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch referral');
     return res.json();
   }
 
@@ -152,7 +201,7 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ notes })
     });
-    if (!res.ok) throw new Error('Failed to accept referral');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to accept referral');
     return res.json();
   }
 
@@ -162,7 +211,7 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ reason, notes })
     });
-    if (!res.ok) throw new Error('Failed to reject referral');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to reject referral');
     return res.json();
   }
 
@@ -180,32 +229,32 @@ export class ApiService {
       headers: this.getHeaders(),
       body: JSON.stringify({ reason })
     });
-    if (!res.ok) throw new Error('Failed to reroute referral');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to reroute referral');
     return res.json();
   }
 
   // Governor Command
   static async getActiveEmergencies() {
     const res = await fetch(`${API_BASE}/governor/active`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch active emergencies');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch active emergencies');
     return res.json();
   }
 
   static async getStatistics(): Promise<GovernorStatistics> {
     const res = await fetch(`${API_BASE}/governor/statistics`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch statistics');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch statistics');
     return res.json();
   }
 
   static async getTimeline(): Promise<{ events: AuditEvent[] }> {
     const res = await fetch(`${API_BASE}/governor/timeline`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch timeline');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch timeline');
     return res.json();
   }
 
   static async getExplanations(emergencyId: string) {
     const res = await fetch(`${API_BASE}/governor/explanations/${emergencyId}`, { headers: this.getHeaders() });
-    if (!res.ok) throw new Error('Failed to fetch explanations');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to fetch explanations');
     return res.json();
   }
 
@@ -215,7 +264,7 @@ export class ApiService {
       method: 'POST',
       headers: this.getHeaders()
     });
-    if (!res.ok) throw new Error('Failed to run demo scenario');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to run demo scenario');
     return res.json();
   }
 
@@ -224,7 +273,7 @@ export class ApiService {
       method: 'POST',
       headers: this.getHeaders()
     });
-    if (!res.ok) throw new Error('Failed to reset simulation');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to reset simulation');
     return res.json();
   }
 
@@ -233,7 +282,7 @@ export class ApiService {
       method: 'POST',
       headers: this.getHeaders()
     });
-    if (!res.ok) throw new Error('Failed to make hospital stale');
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to make hospital stale');
     return res.json();
   }
 }

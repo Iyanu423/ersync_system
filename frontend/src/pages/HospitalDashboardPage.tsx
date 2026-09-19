@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api';
 import type { Hospital, Referral } from '../types';
+import { clockTime } from '../utils/time';
 import { 
   Building2, 
   Bed, 
@@ -72,6 +73,7 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'specialists' | 'facilities' | 'referrals'>('overview');
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [toastIsError, setToastIsError] = useState(false);
 
   useEffect(() => {
     const matched = hospitals.find(h => h.id === selectedHospitalId);
@@ -85,10 +87,10 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
     try {
       const [hData, refs] = await Promise.all([
         ApiService.getHospital(targetId).catch(() => null),
-        ApiService.getReferrals().catch(() => [])
+        ApiService.getReferrals(undefined, targetId).catch(() => null)
       ]);
       if (hData) setHospital(hData);
-      if (refs) setReferrals(refs.filter((r: Referral) => r.hospital_id === targetId));
+      if (refs) setReferrals(refs);
     } catch (e) {
       console.error('Failed to load hospital details', e);
     }
@@ -96,6 +98,9 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
 
   useEffect(() => {
     loadHospitalData();
+    // New referrals arrive while this page is open - poll so staff actually see them
+    const interval = setInterval(loadHospitalData, 5000);
+    return () => clearInterval(interval);
   }, [selectedHospitalId]);
 
   const handleStatusChange = async (newStatus: 'OPEN' | 'LIMITED' | 'CLOSED') => {
@@ -105,7 +110,7 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
       showNotification(`Emergency status set to ${newStatus}`);
       onRefreshHospitals();
     } catch (e) {
-      console.error(e);
+      failAndResync('Status change', e);
     }
   };
 
@@ -117,20 +122,23 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
       showNotification(`Intake ${newVal ? 'ENABLED' : 'DIVERTED'}`);
       onRefreshHospitals();
     } catch (e) {
-      console.error(e);
+      failAndResync('Intake toggle', e);
     }
   };
 
   const handleQuickBedAdjust = async (delta: number) => {
-    const newAvailable = Math.max(0, Math.min(hospital.total_emergency_beds, hospital.available_emergency_beds + delta));
-    const newCapacity = Math.round(((hospital.total_emergency_beds - newAvailable) / hospital.total_emergency_beds) * 100);
+    const total = hospital.total_emergency_beds;
+    const newAvailable = Math.max(0, Math.min(total, hospital.available_emergency_beds + delta));
+    if (newAvailable === hospital.available_emergency_beds) return;
     try {
-      setHospital(prev => ({ ...prev, available_emergency_beds: newAvailable, overall_capacity: newCapacity }));
-      await ApiService.updateHospitalCapacity(hospital.id, newCapacity);
-      showNotification(`Available beds updated to ${newAvailable}`);
+      setHospital(prev => ({ ...prev, available_emergency_beds: newAvailable }));
+      // Changes the real bed rows the Governor counts (reserved beds stay locked to their cases)
+      const updated = await ApiService.updateHospitalBeds(hospital.id, total, newAvailable);
+      setHospital(prev => ({ ...prev, ...updated }));
+      showNotification(`Free beds: ${updated.available_emergency_beds} of ${updated.total_emergency_beds}`);
       onRefreshHospitals();
     } catch (e) {
-      console.error(e);
+      failAndResync('Bed update', e);
     }
   };
 
@@ -148,7 +156,7 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
       showNotification(`${specName}: ${newStatus}`);
       onRefreshHospitals();
     } catch (e) {
-      console.error(e);
+      failAndResync('Specialist update', e);
     }
   };
 
@@ -166,26 +174,41 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
       showNotification(`${facName} set to ${newStatus}`);
       onRefreshHospitals();
     } catch (e) {
-      console.error(e);
+      failAndResync('Facility update', e);
     }
   };
 
   const handleReferralResponse = async (referralId: string, action: 'accept' | 'reject') => {
     try {
-      await ApiService.respondToReferral(referralId, action, action === 'reject' ? 'Emergency Department Surge' : undefined);
-      showNotification(`Referral ${action === 'accept' ? 'ACCEPTED (Bed Reserved)' : 'REJECTED (Auto-Failover)'}`);
+      const result: any = await ApiService.respondToReferral(referralId, action, action === 'reject' ? 'Emergency Department Surge' : undefined);
+      if (action === 'accept') {
+        showNotification(`ACCEPTED - ${result.beds_reserved ?? 1} bed(s) reserved`);
+      } else if (result.next_hospital_contacted) {
+        showNotification(`REJECTED - re-routed to ${String(result.next_hospital_contacted).replace('SIMULATED HOSPITAL — ', '')}`);
+      } else {
+        showNotification('REJECTED - no other eligible hospital; command centre alerted', true);
+      }
       loadHospitalData();
       onRefreshHospitals();
     } catch (e) {
-      console.error(e);
+      failAndResync(action === 'accept' ? 'Accept' : 'Reject', e);
     }
   };
 
-  const showNotification = (msg: string) => {
+  const showNotification = (msg: string, isError = false) => {
+    setToastIsError(isError);
     setSaveToast(msg);
-    setTimeout(() => setSaveToast(null), 3000);
+    setTimeout(() => setSaveToast(null), isError ? 6000 : 3000);
   };
 
+  // Show the server's real reason and roll the screen back to what is actually stored
+  const failAndResync = (action: string, e: any) => {
+    console.error(e);
+    showNotification(`${action} failed: ${e?.message || 'unknown error'}`, true);
+    loadHospitalData();
+  };
+
+  const pendingCount = referrals.filter(r => r.status === 'REQUESTED').length;
   const onDutySpecialistsCount = hospital.specialties?.filter(s => s.status === 'AVAILABLE').length || 0;
   const operationalFacilitiesCount = hospital.facilities?.filter(f => f.available).length || 0;
 
@@ -193,8 +216,8 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Toast Notification */}
       {saveToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className={`fixed bottom-6 right-6 z-50 text-white px-4 py-2.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-sm ${toastIsError ? 'bg-rose-700 border-rose-500' : 'bg-slate-900 border-slate-700'}`}>
+          {toastIsError ? <XCircle className="w-4 h-4 text-rose-200 shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
           <span>{saveToast}</span>
         </div>
       )}
@@ -428,7 +451,7 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
           }`}
         >
           <Inbox className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Incoming Referrals ({referrals.length})</span>
+          <span>Incoming Referrals ({pendingCount} pending)</span>
         </button>
       </div>
 
@@ -583,17 +606,31 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
                     <div className="flex items-center gap-2">
                       <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
                         ref.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                        ref.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
+                        ref.status === 'REJECTED' || ref.status === 'TIMEOUT' ? 'bg-rose-100 text-rose-800 border border-rose-200' :
                         'bg-blue-100 text-blue-800 border border-blue-200'
                       }`}>
                         {ref.status}
                       </span>
                       <span className="text-xs font-bold text-slate-900 font-mono">
-                        Incident #{ref.emergency_id.slice(0, 8)}
+                        {ref.emergency?.incident_reference || `Incident #${ref.emergency_id.slice(0, 8)}`}
                       </span>
+                      {ref.emergency && (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${ref.emergency.severity === 'CRITICAL' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                          {ref.emergency.severity}
+                        </span>
+                      )}
                     </div>
+                    {ref.emergency && (
+                      <div className="text-xs text-slate-700 font-medium">
+                        {ref.emergency.category} &bull; {ref.emergency.patient_count} patient(s) &bull; {ref.emergency.location_name}
+                        <p className="text-[11px] text-slate-500 mt-0.5">{ref.emergency.description}</p>
+                      </div>
+                    )}
                     <div className="text-xs text-slate-500 font-medium">
-                      ETA: <strong className="text-slate-900">{ref.eta_minutes} mins</strong> &bull; Requested: {new Date(ref.requested_at).toLocaleTimeString()}
+                      ETA: <strong className="text-slate-900">{ref.eta_minutes} mins</strong> &bull; Requested: {clockTime(ref.requested_at)}
+                      {ref.status === 'REQUESTED' && ref.reservation_expiry && (
+                        <> &bull; <span className="text-amber-700 font-bold">Respond by {clockTime(ref.reservation_expiry)}</span></>
+                      )}
                     </div>
                   </div>
 
@@ -619,6 +656,10 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
                         <span className="text-emerald-700 flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Bed Reserved
                         </span>
+                      ) : ref.status === 'COMPLETED' ? (
+                        <span className="text-slate-600">Case closed</span>
+                      ) : ref.status === 'TIMEOUT' ? (
+                        <span className="text-rose-700">No response - re-routed</span>
                       ) : (
                         <span className="text-rose-700">Diverted to Next Facility</span>
                       )}

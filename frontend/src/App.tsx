@@ -82,8 +82,9 @@ function App() {
       setDemoResult(null);
       await loadHospitals();
       setActiveTab('command');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to reset simulation', e);
+      alert('Reset failed: ' + (e.message || 'Unknown error'));
     }
   };
 
@@ -129,6 +130,7 @@ function App() {
               onOpenExplain={handleOpenExplain}
               onNavigateToHospital={() => setActiveTab('hospital')}
               onEmergencyTriggered={(em) => setActiveEmergency(em)}
+              currentRole={currentRole}
             />
           )}
 

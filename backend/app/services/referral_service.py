@@ -5,6 +5,17 @@ from app.models.entities import Emergency, Referral, Match, Hospital, EmergencyB
 from app.services.audit_service import audit_service
 from app.services.notification_service import notification_service
 from app.governor.engine import GovernorDecisionEngine
+from app.core.config import settings
+
+ACTIVE_EMERGENCY_STATUSES = ["ANALYSING", "MATCHING", "AWAITING_ACCEPTANCE", "PATIENT_EN_ROUTE", "REROUTING", "ARRIVED"]
+
+
+class NoBedAvailableError(Exception):
+    """Raised when a hospital tries to accept a referral but has no free emergency bed to lock."""
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 class ReferralService:
     @classmethod
@@ -17,6 +28,14 @@ class ReferralService:
         emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
         if not emergency:
             return None
+
+        # Never open a second live referral for the same emergency (e.g. dispatch clicked twice)
+        live = db.query(Referral).filter(
+            Referral.emergency_id == emergency_id,
+            Referral.status.in_(["REQUESTED", "ACCEPTED"])
+        ).first()
+        if live:
+            return live
 
         # If hospital_id is not specified, pick highest ranked eligible match
         if not hospital_id:
@@ -34,6 +53,17 @@ class ReferralService:
             if not best_match:
                 emergency.status = "NO_MATCH"
                 db.commit()
+                audit_service.log(
+                    db=db, action="ALL_CANDIDATES_EXHAUSTED", entity_type="EMERGENCY",
+                    entity_id=emergency.id, actor="GOVERNOR_ENGINE",
+                    metadata={"incident_reference": emergency.incident_reference}
+                )
+                notification_service.send(
+                    db=db, recipient_type="ADMIN", type="NO_MATCH_ALERT",
+                    title=f"No hospital available for {emergency.incident_reference}",
+                    message="Every eligible hospital has rejected or timed out. Manual dispatch required.",
+                    metadata={"emergency_id": emergency.id}
+                )
                 return None
             hospital_id = best_match.hospital_id
 
@@ -54,7 +84,7 @@ class ReferralService:
             hospital_id=hospital_id,
             status="REQUESTED",
             requested_at=utc_now(),
-            reservation_expiry=utc_now() + timedelta(minutes=15),
+            reservation_expiry=utc_now() + timedelta(minutes=settings.REFERRAL_TIMEOUT_MINUTES),
             eta_minutes=eta
         )
         db.add(referral)
@@ -85,7 +115,7 @@ class ReferralService:
             recipient_id=hospital.id,
             type="ACCEPTANCE_REQUEST",
             title=f"🚨 INCOMING EMERGENCY: {emergency.incident_reference}",
-            message=f"Urgent emergency referral ({emergency.severity}). ETA: {eta} min. Please accept or reject.",
+            message=f"Urgent emergency referral ({emergency.severity}, {emergency.patient_count} patient(s)). ETA: {eta} min. Respond within {settings.REFERRAL_TIMEOUT_MINUTES:g} min or it will be re-routed.",
             metadata={"referral_id": referral.id, "emergency_id": emergency.id}
         )
 
@@ -99,6 +129,11 @@ class ReferralService:
         notes: Optional[str] = None,
         actor: str = "HOSPITAL_STAFF"
     ) -> Tuple[Optional[Referral], Optional[EmergencyBed]]:
+        """
+        Locks emergency bed(s) and confirms the referral.
+        Reserves one bed per patient where possible (at least one is required, otherwise
+        NoBedAvailableError is raised and nothing changes). Returns (referral, first reserved bed).
+        """
         referral = db.query(Referral).filter(Referral.id == referral_id).first()
         if not referral or referral.status != "REQUESTED":
             return None, None
@@ -106,83 +141,74 @@ class ReferralService:
         emergency = db.query(Emergency).filter(Emergency.id == referral.emergency_id).first()
         hospital = db.query(Hospital).filter(Hospital.id == referral.hospital_id).first()
 
-        # Update Referral status
+        wanted = max(1, emergency.patient_count or 1)
+        free_beds = db.query(EmergencyBed).filter(
+            EmergencyBed.hospital_id == referral.hospital_id,
+            EmergencyBed.status == "AVAILABLE"
+        ).order_by(EmergencyBed.bed_number).limit(wanted).all()
+
+        if not free_beds:
+            raise NoBedAvailableError(
+                f"{hospital.name} has no free emergency bed to reserve. "
+                "Update your bed count or reject the referral so it can be re-routed."
+            )
+
+        for bed in free_beds:
+            bed.status = "RESERVED"
+            bed.reserved_for = emergency.id
+            bed.updated_at = utc_now()
+
+        reserved_bed = free_beds[0]
+        partial = len(free_beds) < wanted
         referral.status = "ACCEPTED"
         referral.accepted_at = utc_now()
         referral.notes = notes or "Emergency accepted. Emergency bed and trauma team reserved."
+        if partial:
+            referral.notes += f" | PARTIAL: {len(free_beds)} of {wanted} beds reserved - remaining patients need another facility."
 
-        # Reserve Emergency Bed
-        reserved_bed = db.query(EmergencyBed).filter(
-            EmergencyBed.hospital_id == referral.hospital_id,
-            EmergencyBed.status == "AVAILABLE"
-        ).first()
-
-        if reserved_bed:
-            reserved_bed.status = "RESERVED"
-            reserved_bed.reserved_for = emergency.id
-            reserved_bed.updated_at = utc_now()
-
-        # Update Emergency status
         emergency.status = "PATIENT_EN_ROUTE"
         db.commit()
         db.refresh(referral)
         db.refresh(emergency)
-        if reserved_bed:
-            db.refresh(reserved_bed)
 
-        # Audit Logs
         audit_service.log(
-            db=db,
-            action="ACCEPTED",
-            entity_type="REFERRAL",
-            entity_id=referral.id,
-            actor=actor,
+            db=db, action="ACCEPTED", entity_type="REFERRAL", entity_id=referral.id, actor=actor,
             metadata={
-                "hospital_id": hospital.id,
-                "hospital_name": hospital.name,
-                "bed_reserved": reserved_bed.bed_number if reserved_bed else "None"
+                "hospital_id": hospital.id, "hospital_name": hospital.name,
+                "beds_reserved": [b.bed_number for b in free_beds], "patients": wanted
             }
         )
+        audit_service.log(
+            db=db, action="BED_RESERVED", entity_type="EMERGENCY_BED", entity_id=reserved_bed.id,
+            actor="HOSPITAL_SYSTEM",
+            metadata={"bed_numbers": [b.bed_number for b in free_beds], "emergency_id": emergency.id}
+        )
 
-        if reserved_bed:
-            audit_service.log(
-                db=db,
-                action="BED_RESERVED",
-                entity_type="EMERGENCY_BED",
-                entity_id=reserved_bed.id,
-                actor="HOSPITAL_SYSTEM",
-                metadata={"bed_number": reserved_bed.bed_number, "emergency_id": emergency.id}
-            )
-
-        # Patient Notification
+        bed_msg = f"{len(free_beds)} emergency bed(s) confirmed" + (f" (of {wanted} patients)" if partial else "")
         notification_service.send(
-            db=db,
-            recipient_type="PATIENT",
-            type="REFERRAL_CONFIRMED",
+            db=db, recipient_type="PATIENT", type="REFERRAL_CONFIRMED",
             title="EMERGENCY DESTINATION CONFIRMED",
-            message=f"Proceed immediately to {hospital.name}. Emergency bed confirmed. ETA: {referral.eta_minutes} min.",
+            message=f"Proceed immediately to {hospital.name}. {bed_msg}. ETA: {referral.eta_minutes} min.",
             metadata={
-                "hospital_name": hospital.name,
-                "address": hospital.address,
-                "phone": hospital.phone,
-                "latitude": hospital.latitude,
-                "longitude": hospital.longitude,
-                "eta_minutes": referral.eta_minutes
+                "hospital_name": hospital.name, "address": hospital.address, "phone": hospital.phone,
+                "latitude": hospital.latitude, "longitude": hospital.longitude,
+                "eta_minutes": referral.eta_minutes, "emergency_id": emergency.id
             }
         )
-
-        # Hospital Notification
         notification_service.send(
-            db=db,
-            recipient_type="HOSPITAL",
-            recipient_id=hospital.id,
-            type="REFERRAL_CONFIRMED",
+            db=db, recipient_type="HOSPITAL", recipient_id=hospital.id, type="REFERRAL_CONFIRMED",
             title="PATIENT EN ROUTE",
-            message=f"Patient en route to {hospital.name} ({emergency.incident_reference}). Bed {reserved_bed.bed_number if reserved_bed else 'reserved'} prepped.",
+            message=f"Patient en route to {hospital.name} ({emergency.incident_reference}). {bed_msg}: {', '.join(b.bed_number for b in free_beds)}.",
             metadata={"emergency_id": emergency.id, "referral_id": referral.id}
         )
-
         return referral, reserved_bed
+
+    @classmethod
+    def _failover(cls, db: Session, emergency: Emergency) -> Optional[Referral]:
+        """Re-score every hospital on live data, then contact the best one not yet tried."""
+        from app.services.emergency_service import emergency_service
+        emergency_service.match_hospitals(db, emergency.id)
+        return cls.request_acceptance(db, emergency.id)
 
     @classmethod
     def reject_referral(
@@ -200,37 +226,23 @@ class ReferralService:
         emergency = db.query(Emergency).filter(Emergency.id == referral.emergency_id).first()
         hospital = db.query(Hospital).filter(Hospital.id == referral.hospital_id).first()
 
-        # Update Referral to REJECTED
         referral.status = "REJECTED"
         referral.rejected_at = utc_now()
         referral.rejection_reason = reason
         referral.notes = notes
-
-        # Update emergency to REROUTING
         emergency.status = "REROUTING"
         db.commit()
 
         audit_service.log(
-            db=db,
-            action="REFERRAL_REJECTED",
-            entity_type="REFERRAL",
-            entity_id=referral.id,
-            actor=actor,
+            db=db, action="REFERRAL_REJECTED", entity_type="REFERRAL", entity_id=referral.id, actor=actor,
             metadata={"hospital_id": hospital.id, "hospital_name": hospital.name, "reason": reason}
         )
-
         audit_service.log(
-            db=db,
-            action="FAILOVER_TRIGGERED",
-            entity_type="EMERGENCY",
-            entity_id=emergency.id,
-            actor="GOVERNOR_ENGINE",
-            metadata={"rejected_by": hospital.name, "trigger": "Hospital Rejection"}
+            db=db, action="FAILOVER_TRIGGERED", entity_type="EMERGENCY", entity_id=emergency.id,
+            actor="GOVERNOR_ENGINE", metadata={"rejected_by": hospital.name, "trigger": "Hospital Rejection"}
         )
 
-        # AUTOMATIC FAILOVER: Find next best candidate
-        next_referral = cls.request_acceptance(db, emergency.id)
-
+        next_referral = cls._failover(db, emergency)
         return referral, next_referral
 
     @classmethod
@@ -242,12 +254,11 @@ class ReferralService:
         actor: str = "SYSTEM_FAILOVER"
     ) -> Tuple[Optional[Referral], Optional[Referral]]:
         referral = db.query(Referral).filter(Referral.id == referral_id).first()
-        if not referral:
+        if not referral or referral.status not in ("REQUESTED", "ACCEPTED"):
             return None, None
 
         emergency = db.query(Emergency).filter(Emergency.id == referral.emergency_id).first()
-        
-        # Release any reserved bed
+
         beds = db.query(EmergencyBed).filter(EmergencyBed.reserved_for == emergency.id).all()
         for b in beds:
             b.status = "AVAILABLE"
@@ -260,16 +271,87 @@ class ReferralService:
         db.commit()
 
         audit_service.log(
-            db=db,
-            action="REROUTE_INITIATED",
-            entity_type="REFERRAL",
-            entity_id=referral.id,
-            actor=actor,
-            metadata={"reason": reason}
+            db=db, action="REROUTE_INITIATED", entity_type="REFERRAL", entity_id=referral.id,
+            actor=actor, metadata={"reason": reason}
         )
-
-        # Trigger new referral to next eligible hospital
-        next_referral = cls.request_acceptance(db, emergency.id)
+        next_referral = cls._failover(db, emergency)
         return referral, next_referral
+
+    @classmethod
+    def expire_stale_referrals(cls, db: Session) -> int:
+        """
+        Enforces the referral response window: any REQUESTED referral past its reservation_expiry
+        is marked TIMEOUT and the case automatically fails over to the next best hospital.
+        Returns the number of referrals expired.
+        """
+        now = datetime.now(timezone.utc)
+        pending = db.query(Referral).filter(
+            Referral.status == "REQUESTED", Referral.reservation_expiry.isnot(None)
+        ).all()
+        expired = 0
+        for ref in pending:
+            if _as_utc(ref.reservation_expiry) > now:
+                continue
+            emergency = db.query(Emergency).filter(Emergency.id == ref.emergency_id).first()
+            hospital = db.query(Hospital).filter(Hospital.id == ref.hospital_id).first()
+            ref.status = "TIMEOUT"
+            ref.rejected_at = utc_now()
+            ref.rejection_reason = f"No response within {settings.REFERRAL_TIMEOUT_MINUTES:g} minutes"
+            if emergency and emergency.status == "AWAITING_ACCEPTANCE":
+                emergency.status = "REROUTING"
+            db.commit()
+            expired += 1
+
+            audit_service.log(
+                db=db, action="REFERRAL_TIMEOUT", entity_type="REFERRAL", entity_id=ref.id, actor="SYSTEM_TIMER",
+                metadata={"hospital_id": ref.hospital_id, "hospital_name": hospital.name if hospital else None}
+            )
+            notification_service.send(
+                db=db, recipient_type="HOSPITAL", recipient_id=ref.hospital_id, type="REFERRAL_TIMEOUT",
+                title="Referral expired",
+                message=f"No response for {emergency.incident_reference if emergency else ref.emergency_id}; the case was re-routed.",
+                metadata={"referral_id": ref.id}
+            )
+            if emergency and emergency.status == "REROUTING":
+                audit_service.log(
+                    db=db, action="FAILOVER_TRIGGERED", entity_type="EMERGENCY", entity_id=emergency.id,
+                    actor="GOVERNOR_ENGINE",
+                    metadata={"rejected_by": hospital.name if hospital else ref.hospital_id, "trigger": "Timeout"}
+                )
+                cls._failover(db, emergency)
+        return expired
+
+    @classmethod
+    def mark_arrived(cls, db: Session, emergency_id: str, actor: str = "HOSPITAL_STAFF") -> Optional[Emergency]:
+        emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
+        if not emergency:
+            return None
+        if emergency.status not in ("PATIENT_EN_ROUTE", "ACCEPTED"):
+            raise ValueError(f"Emergency is '{emergency.status}'; only an accepted, en-route case can be marked arrived.")
+        for bed in emergency.reserved_beds:
+            bed.status = "OCCUPIED"
+            bed.updated_at = utc_now()
+        emergency.status = "ARRIVED"
+        db.commit()
+        audit_service.log(db=db, action="PATIENT_ARRIVED", entity_type="EMERGENCY", entity_id=emergency.id, actor=actor)
+        return emergency
+
+    @classmethod
+    def close_case(cls, db: Session, emergency_id: str, actor: str = "HOSPITAL_STAFF") -> Optional[Emergency]:
+        emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
+        if not emergency:
+            return None
+        if emergency.status not in ("ARRIVED", "PATIENT_EN_ROUTE", "ACCEPTED"):
+            raise ValueError(f"Emergency is '{emergency.status}'; only an accepted/arrived case can be closed.")
+        for bed in emergency.reserved_beds:
+            bed.status = "AVAILABLE"
+            bed.reserved_for = None
+            bed.updated_at = utc_now()
+        for ref in db.query(Referral).filter(Referral.emergency_id == emergency.id, Referral.status == "ACCEPTED").all():
+            ref.status = "COMPLETED"
+        emergency.status = "CLOSED"
+        db.commit()
+        audit_service.log(db=db, action="EMERGENCY_CLOSED", entity_type="EMERGENCY", entity_id=emergency.id, actor=actor)
+        return emergency
 
 referral_service = ReferralService()

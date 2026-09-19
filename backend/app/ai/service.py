@@ -1,7 +1,6 @@
 from app.core.config import settings
 from app.ai.base import AIProvider
-from app.ai.mock_provider import MockAIProvider
-from app.ai.openai_provider import OpenAICompatibleProvider
+from app.ai.factory import get_ai_provider
 from app.schemas.schemas import AIAnalysisResult
 from typing import Dict, Any, Optional
 
@@ -14,20 +13,7 @@ class AIService:
     _provider: AIProvider
 
     def __init__(self):
-        if settings.AI_PROVIDER == "openai" and settings.OPENAI_API_KEY:
-            self._provider = OpenAICompatibleProvider(
-                api_key=settings.OPENAI_API_KEY,
-                base_url=settings.OPENAI_BASE_URL,
-                model=settings.AI_MODEL
-            )
-        elif settings.AI_PROVIDER == "local":
-            self._provider = OpenAICompatibleProvider(
-                api_key="local",
-                base_url=settings.LOCAL_LLM_URL,
-                model=settings.AI_MODEL
-            )
-        else:
-            self._provider = MockAIProvider()
+        self._provider = get_ai_provider()
 
     @classmethod
     def get_instance(cls) -> "AIService":

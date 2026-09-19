@@ -101,6 +101,8 @@ class DemoService:
         # Step 4: Request Acceptance from Hospital #1
         first_match = eligible[0]
         first_hosp = first_match.hospital
+        # Snapshot plain values: failover re-scores hospitals and recreates Match rows
+        first_snap = {"score": first_match.score, "eta_minutes": first_match.eta_minutes, "distance_km": first_match.distance_km}
         ref1 = referral_service.request_acceptance(db, emergency.id, first_hosp.id)
 
         add_step(
@@ -108,9 +110,9 @@ class DemoService:
             status="PENDING_ACCEPTANCE",
             details={
                 "hospital_name": first_hosp.name,
-                "score": first_match.score,
-                "eta_minutes": first_match.eta_minutes,
-                "distance_km": first_match.distance_km
+                "score": first_snap["score"],
+                "eta_minutes": first_snap["eta_minutes"],
+                "distance_km": first_snap["distance_km"]
             }
         )
 
@@ -135,12 +137,13 @@ class DemoService:
         )
 
         # Step 6: Hospital #2 Acceptance & Bed Reservation
-        second_match = eligible[1] if len(eligible) > 1 else eligible[0]
-        second_hosp = second_match.hospital
-        
-        # Verify referral 2 exists or create it
+        # Failover re-scored every hospital on live data; use whoever it actually contacted
         if not ref2_req:
-            ref2_req = referral_service.request_acceptance(db, emergency.id, second_hosp.id)
+            raise RuntimeError("Demo scenario requires at least 2 eligible hospitals; failover found no second candidate.")
+        second_hosp = ref2_req.hospital
+        second_match = db.query(Match).filter(
+            Match.emergency_id == emergency.id, Match.hospital_id == second_hosp.id
+        ).first()
 
         ref2_acc, reserved_bed = referral_service.accept_referral(
             db=db,
@@ -181,8 +184,8 @@ class DemoService:
             first_hospital_attempted={
                 "id": first_hosp.id,
                 "name": first_hosp.name,
-                "score": first_match.score,
-                "eta_minutes": first_match.eta_minutes
+                "score": first_snap["score"],
+                "eta_minutes": first_snap["eta_minutes"]
             },
             first_rejection_reason=rejection_reason,
             second_hospital_attempted={

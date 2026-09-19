@@ -9,6 +9,18 @@ from app.models.entities import (
 )
 from app.auth.security import get_password_hash
 
+def get_seed_path() -> str:
+    """Locate hospitals.json. Prefers backend/data/seed (deployed with the backend), then <repo>/data/seed."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.abspath(os.path.join(here, "..", "..", "data", "seed", "hospitals.json")),
+        os.path.abspath(os.path.join(here, "..", "..", "..", "data", "seed", "hospitals.json")),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return candidates[0]
+
 def init_db(db: Session = None, force_seed: bool = False):
     """
     Initializes database tables and seeds demo hospitals, reference catalogs, and users.
@@ -82,62 +94,62 @@ def init_db(db: Session = None, force_seed: bool = False):
                 db.add(Facility(name=fac_name))
 
         # 3. Load 10 Simulated Hospitals from JSON
-        seed_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "seed", "hospitals.json")
-        seed_path = os.path.abspath(seed_path)
+        seed_path = get_seed_path()
 
-        if os.path.exists(seed_path):
-            with open(seed_path, "r", encoding="utf-8") as f:
-                hospitals_data = json.load(f)
+        if not os.path.exists(seed_path):
+            raise RuntimeError(f"Hospital seed file not found at {seed_path}. The app cannot run without hospitals.")
+        with open(seed_path, "r", encoding="utf-8") as f:
+            hospitals_data = json.load(f)
 
-            now = datetime.now(timezone.utc)
-            for h_data in hospitals_data:
-                stale_mins = h_data.get("stale_minutes_ago", 5)
-                last_up = now - timedelta(minutes=stale_mins)
+        now = datetime.now(timezone.utc)
+        for h_data in hospitals_data:
+            stale_mins = h_data.get("stale_minutes_ago", 5)
+            last_up = now - timedelta(minutes=stale_mins)
 
-                hosp = Hospital(
-                    id=h_data["id"],
-                    name=h_data["name"],
-                    address=h_data["address"],
-                    latitude=h_data["latitude"],
-                    longitude=h_data["longitude"],
-                    phone=h_data["phone"],
-                    emergency_status=h_data.get("emergency_status", "OPEN"),
-                    overall_capacity=h_data.get("overall_capacity", 70.0),
-                    accepting_emergencies=h_data.get("accepting_emergencies", True),
-                    last_status_update=last_up
+            hosp = Hospital(
+                id=h_data["id"],
+                name=h_data["name"],
+                address=h_data["address"],
+                latitude=h_data["latitude"],
+                longitude=h_data["longitude"],
+                phone=h_data["phone"],
+                emergency_status=h_data.get("emergency_status", "OPEN"),
+                overall_capacity=h_data.get("overall_capacity", 70.0),
+                accepting_emergencies=h_data.get("accepting_emergencies", True),
+                last_status_update=last_up
+            )
+            db.add(hosp)
+            db.flush()
+
+            # Add Specialties
+            for s in h_data.get("specialties", []):
+                h_spec = HospitalSpecialty(
+                    hospital_id=hosp.id,
+                    specialty_name=s["name"],
+                    available_count=s.get("count", 1),
+                    status=s.get("status", "AVAILABLE")
                 )
-                db.add(hosp)
-                db.flush()
+                db.add(h_spec)
 
-                # Add Specialties
-                for s in h_data.get("specialties", []):
-                    h_spec = HospitalSpecialty(
-                        hospital_id=hosp.id,
-                        specialty_name=s["name"],
-                        available_count=s.get("count", 1),
-                        status=s.get("status", "AVAILABLE")
-                    )
-                    db.add(h_spec)
+            # Add Facilities
+            for fac in h_data.get("facilities", []):
+                h_fac = HospitalFacility(
+                    hospital_id=hosp.id,
+                    facility_name=fac["name"],
+                    available=fac.get("available", True),
+                    status=fac.get("status", "OPERATIONAL"),
+                    quantity=fac.get("quantity", 1)
+                )
+                db.add(h_fac)
 
-                # Add Facilities
-                for fac in h_data.get("facilities", []):
-                    h_fac = HospitalFacility(
-                        hospital_id=hosp.id,
-                        facility_name=fac["name"],
-                        available=fac.get("available", True),
-                        status=fac.get("status", "OPERATIONAL"),
-                        quantity=fac.get("quantity", 1)
-                    )
-                    db.add(h_fac)
-
-                # Add Beds
-                for b in h_data.get("beds", []):
-                    h_bed = EmergencyBed(
-                        hospital_id=hosp.id,
-                        bed_number=b["bed_number"],
-                        status=b.get("status", "AVAILABLE")
-                    )
-                    db.add(h_bed)
+            # Add Beds
+            for b in h_data.get("beds", []):
+                h_bed = EmergencyBed(
+                    hospital_id=hosp.id,
+                    bed_number=b["bed_number"],
+                    status=b.get("status", "AVAILABLE")
+                )
+                db.add(h_bed)
 
         db.commit()
     finally:

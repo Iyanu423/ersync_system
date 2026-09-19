@@ -55,8 +55,12 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> Optional[User]:
     """
-    Retrieves user from JWT bearer token.
-    For hackathon demo convenience, also supports rapid role-switching headers (X-Demo-Role).
+    Resolves the caller.
+    1. A valid JWT bearer token always wins.
+    2. Only when DEMO_MODE is on, the X-Demo-Role / X-Demo-Hospital headers can impersonate a role
+       (X-Demo-Hospital picks which hospital a HOSPITAL_STAFF persona belongs to).
+    3. Otherwise the caller is anonymous. In demo mode anonymous callers get the least-privileged
+       PATIENT persona (never admin); outside demo mode they are rejected.
     """
     if token:
         try:
@@ -69,15 +73,20 @@ def get_current_user(
         except JWTError:
             pass
 
-    # Fast demo fallback header
-    if x_demo_role:
-        role_user = db.query(User).filter(User.role == x_demo_role.upper()).first()
-        if role_user:
-            return role_user
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
-    # Default to demo admin in development if nothing provided
-    default_admin = db.query(User).filter(User.username == "admin").first()
-    return default_admin
+    role = (x_demo_role or "PATIENT").upper()
+    role_user = db.query(User).filter(User.role == role).first()
+    if not role_user:
+        return None
+    if role == "HOSPITAL_STAFF" and x_demo_hospital:
+        # Transient (never persisted) copy so the header can pick the hospital without touching the DB row
+        return User(
+            id=role_user.id, username=role_user.username, full_name=role_user.full_name,
+            role=role_user.role, hospital_id=x_demo_hospital, is_active=True
+        )
+    return role_user
 
 def require_admin(user: Optional[User] = Depends(get_current_user)) -> User:
     if not user or user.role != "ADMIN":

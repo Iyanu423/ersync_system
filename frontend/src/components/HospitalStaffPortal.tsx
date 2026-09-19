@@ -63,16 +63,11 @@ export const HospitalStaffPortal: React.FC<HospitalStaffPortalProps> = ({
     available: hospital.available_emergency_beds || 15,
   });
 
+  // Names must match the backend catalog exactly, otherwise updates create rows the Governor never reads
   const defaultSpecialists = [
-    { name: 'General Doctor', status: 'AVAILABLE', count: 4 },
-    { name: 'Surgeon', status: 'AVAILABLE', count: 2 },
-    { name: 'Orthopaedic Specialist', status: 'AVAILABLE', count: 1 },
-    { name: 'Neurosurgeon', status: 'AVAILABLE', count: 1 },
-    { name: 'Cardiologist', status: 'AVAILABLE', count: 1 },
-    { name: 'Paediatrician', status: 'AVAILABLE', count: 2 },
-    { name: 'Obstetrician/Gynaecologist', status: 'AVAILABLE', count: 2 },
-    { name: 'Anaesthetist', status: 'AVAILABLE', count: 2 },
-  ];
+    'General Medicine', 'Surgery', 'Orthopaedics', 'Neurosurgery', 'Cardiology', 'Paediatrics',
+    'Obstetrics/Gynaecology', 'Anaesthesia'
+  ].map(name => ({ name, status: 'AVAILABLE', count: 1 }));
 
   const [specialists, setSpecialists] = useState<any[]>(
     hospital.specialties && hospital.specialties.length > 0 
@@ -85,15 +80,8 @@ export const HospitalStaffPortal: React.FC<HospitalStaffPortalProps> = ({
   );
 
   const defaultFacilities = [
-    { name: 'Emergency Department', available: true, status: 'OPERATIONAL' },
-    { name: 'Operating Theatre', available: true, status: 'OPERATIONAL' },
-    { name: 'ICU (Intensive Care)', available: true, status: 'OPERATIONAL' },
-    { name: 'CT Scanner', available: true, status: 'OPERATIONAL' },
-    { name: 'X-Ray Imaging', available: true, status: 'OPERATIONAL' },
-    { name: 'Ultrasound', available: true, status: 'OPERATIONAL' },
-    { name: 'Blood Bank', available: true, status: 'OPERATIONAL' },
-    { name: 'Ambulance Fleet', available: true, status: 'OPERATIONAL' },
-  ];
+    'Emergency Department', 'Operating Theatre', 'ICU', 'CT Scanner', 'X-Ray', 'Ultrasound', 'Blood Bank', 'Ambulance'
+  ].map(name => ({ name, available: true, status: 'OPERATIONAL' }));
 
   const [facilities, setFacilities] = useState<any[]>(
     hospital.facilities && hospital.facilities.length > 0

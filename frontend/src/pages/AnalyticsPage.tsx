@@ -13,22 +13,24 @@ import {
   Building2
 } from 'lucide-react';
 
-const DEFAULT_STATS: GovernorStatistics = {
-  total_emergencies: 14,
-  active_emergencies: 3,
-  total_hospitals: 5,
-  hospitals_accepting: 5,
-  total_beds: 42,
-  available_beds: 18,
-  referrals_accepted: 12,
-  referrals_rejected: 2,
-  reroutes_count: 1,
-  average_matching_time_ms: 840.0,
+const EMPTY_STATS: GovernorStatistics = {
+  total_emergencies: 0,
+  active_emergencies: 0,
+  total_hospitals: 0,
+  hospitals_accepting: 0,
+  total_beds: 0,
+  available_beds: 0,
+  referrals_accepted: 0,
+  referrals_rejected: 0,
+  referrals_timed_out: 0,
+  reroutes_count: 0,
+  average_matching_time_ms: 0,
   stale_hospitals_count: 0
 };
 
 export const AnalyticsPage: React.FC = () => {
-  const [stats, setStats] = useState<GovernorStatistics>(DEFAULT_STATS);
+  const [stats, setStats] = useState<GovernorStatistics>(EMPTY_STATS);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>('Just now');
 
@@ -37,11 +39,12 @@ export const AnalyticsPage: React.FC = () => {
     try {
       const data = await ApiService.getStatistics();
       if (data && typeof data === 'object') {
+        setLoadError(null);
         setStats(data);
         setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       }
     } catch (e) {
-      console.warn('Using default demo stats:', e);
+      setLoadError('Cannot reach the ER-Sync backend, so these figures are not live.');
     } finally {
       setIsLoading(false);
     }
@@ -53,14 +56,14 @@ export const AnalyticsPage: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const totalReferrals = (stats.referrals_accepted || 0) + (stats.referrals_rejected || 0);
+  const totalReferrals = (stats.referrals_accepted || 0) + (stats.referrals_rejected || 0) + (stats.referrals_timed_out || 0);
   const acceptanceRate = totalReferrals > 0 
-    ? Math.round((stats.referrals_accepted / totalReferrals) * 100) 
-    : 92;
+    ? `${Math.round((stats.referrals_accepted / totalReferrals) * 100)}%`
+    : '—';
 
   const bedUtilization = stats.total_beds > 0
     ? Math.round(((stats.total_beds - stats.available_beds) / stats.total_beds) * 100)
-    : 57;
+    : 0;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -83,6 +86,10 @@ export const AnalyticsPage: React.FC = () => {
         </div>
       </div>
 
+      {loadError && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold">{loadError}</div>
+      )}
+
       {/* Key KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Referral Rate */}
@@ -94,11 +101,11 @@ export const AnalyticsPage: React.FC = () => {
             </div>
           </div>
           <div className="text-3xl font-black text-slate-900 tracking-tight">
-            {acceptanceRate}%
+            {acceptanceRate}
           </div>
           <div className="text-xs text-emerald-700 font-bold flex items-center gap-1">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>{stats.referrals_accepted} accepted &bull; {stats.referrals_rejected} rerouted</span>
+            <span>{stats.referrals_accepted} accepted &bull; {stats.referrals_rejected} rejected &bull; {stats.referrals_timed_out} timed out</span>
           </div>
         </div>
 
@@ -111,10 +118,10 @@ export const AnalyticsPage: React.FC = () => {
             </div>
           </div>
           <div className="text-3xl font-black text-blue-600 tracking-tight">
-            {Math.round(stats.average_matching_time_ms || 840)} ms
+            {stats.average_matching_time_ms > 0 ? `${Math.round(stats.average_matching_time_ms)} ms` : '—'}
           </div>
           <div className="text-xs text-slate-500 font-semibold">
-            Sub-second algorithmic matching
+            Average measured Governor matching time
           </div>
         </div>
 
@@ -134,19 +141,19 @@ export const AnalyticsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Safety Precision */}
+        {/* Unanswered referrals */}
         <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs hover:border-slate-300 transition-all space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Safety Enforcement</span>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Unanswered Referrals</span>
             <div className="p-2 bg-purple-50 rounded-xl">
               <CheckCircle2 className="w-4 h-4 text-purple-600" />
             </div>
           </div>
           <div className="text-3xl font-black text-purple-600 tracking-tight">
-            100%
+            {stats.referrals_timed_out}
           </div>
           <div className="text-xs text-slate-500 font-semibold">
-            Zero bypass violations recorded
+            Timed out and automatically re-routed
           </div>
         </div>
       </div>
@@ -182,7 +189,7 @@ export const AnalyticsPage: React.FC = () => {
               <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                  style={{ width: `${stats.total_emergencies > 0 ? (stats.referrals_accepted / stats.total_emergencies) * 100 : 85}%` }}
+                  style={{ width: `${stats.total_emergencies > 0 ? (stats.referrals_accepted / stats.total_emergencies) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
@@ -190,12 +197,12 @@ export const AnalyticsPage: React.FC = () => {
             <div>
               <div className="flex justify-between text-slate-700 mb-1.5 font-bold">
                 <span>Auto-Failover Reroutes</span>
-                <strong className="text-amber-700">{stats.referrals_rejected} Diverted</strong>
+                <strong className="text-amber-700">{stats.reroutes_count} Triggered</strong>
               </div>
               <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-amber-500 rounded-full transition-all duration-500" 
-                  style={{ width: `${stats.total_emergencies > 0 ? (stats.referrals_rejected / stats.total_emergencies) * 100 : 15}%` }}
+                  style={{ width: `${stats.total_emergencies > 0 ? (stats.reroutes_count / stats.total_emergencies) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
@@ -221,7 +228,7 @@ export const AnalyticsPage: React.FC = () => {
             <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1">
               <div className="text-slate-500 text-[11px] font-bold">Travel Time &amp; Distance</div>
               <div className="text-2xl font-black text-slate-900">30%</div>
-              <p className="text-[10px] text-slate-500">Live GPS ambulance ETA routing</p>
+              <p className="text-[10px] text-slate-500">Estimated road ETA with Lagos traffic factor</p>
             </div>
             <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1">
               <div className="text-slate-500 text-[11px] font-bold">Emergency Bed Headroom</div>

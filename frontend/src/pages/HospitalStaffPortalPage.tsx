@@ -85,7 +85,8 @@ export const HospitalStaffPortalPage: React.FC<HospitalStaffPortalPageProps> = (
             }, 100);
           }}
           onBedCapacityChange={(total, occupied, reserved) => {
-            ApiService.updateHospitalCapacity(hospitalId, total);
+            ApiService.updateHospitalBeds(hospitalId, total, Math.max(0, total - occupied - reserved))
+              .catch((e) => alert('Bed update failed: ' + e.message));
           }}
           onSpecialistUpdate={(specialist, count, status) => {
             ApiService.updateSpecialist(hospitalId, specialist, count, status);

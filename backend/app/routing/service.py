@@ -1,6 +1,7 @@
 from typing import Tuple, List, Optional
 from app.routing.base import RoutingProvider
 from app.routing.deterministic import DeterministicRoutingProvider
+from app.routing.osrm import OSRMRoutingProvider
 from app.core.config import settings
 
 class RoutingService:
@@ -8,8 +9,11 @@ class RoutingService:
     _provider: RoutingProvider
 
     def __init__(self):
-        # Default to deterministic provider for resilient demo and tests
-        self._provider = DeterministicRoutingProvider()
+        # ROUTING_PROVIDER=osrm uses live road routing (auto-falls back to the deterministic model)
+        if settings.ROUTING_PROVIDER == "osrm" and settings.OSRM_BASE_URL:
+            self._provider = OSRMRoutingProvider()
+        else:
+            self._provider = DeterministicRoutingProvider()
 
     @classmethod
     def get_instance(cls) -> "RoutingService":

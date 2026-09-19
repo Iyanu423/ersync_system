@@ -6,14 +6,69 @@ from app.models.entities import Emergency, EmergencyRequirement
 from app.schemas.schemas import EmergencyCreate, EmergencyResponse, EmergencyRequirementItem, AIAnalysisResult
 from app.services.emergency_service import emergency_service
 from app.ai.service import ai_service
-from app.auth.security import get_current_user
+from app.auth.security import get_current_user, require_hospital_staff
 
 router = APIRouter()
 
 @router.post("", response_model=EmergencyResponse, status_code=status.HTTP_201_CREATED)
 async def create_emergency(payload: EmergencyCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    emergency, ai_result = await emergency_service.create_and_triage(db, payload, actor=f"USER:{current_user.username if current_user else 'anonymous'}")
+    # Full pipeline: AI triage -> Governor matching -> referral sent to the best eligible hospital
+    emergency, ai_result = await emergency_service.dispatch_emergency(db, payload, actor=f"USER:{current_user.username if current_user else 'anonymous'}")
     return await _format_emergency(db, emergency, ai_result)
+
+@router.post("/{emergency_id}/dispatch", response_model=dict)
+async def redispatch_emergency(emergency_id: str, db: Session = Depends(get_db), current_user = Depends(require_hospital_staff)):
+    """Re-run matching on live hospital data and contact the best hospital not yet tried (e.g. after NO_MATCH)."""
+    from app.services.referral_service import referral_service
+    emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
+    if not emergency:
+        raise HTTPException(status_code=404, detail="Emergency not found")
+    if emergency.status in ("CLOSED", "CANCELLED", "ARRIVED"):
+        raise HTTPException(status_code=409, detail=f"Emergency is already {emergency.status}")
+    emergency_service.match_hospitals(db, emergency_id)
+    referral = referral_service.request_acceptance(db, emergency_id)
+    db.refresh(emergency)
+    return {
+        "emergency_id": emergency_id,
+        "status": emergency.status,
+        "referral_id": referral.id if referral else None,
+        "hospital_name": referral.hospital.name if referral and referral.hospital else None
+    }
+
+def _authorize_case_action(db: Session, emergency_id: str, user):
+    """Hospital staff may only act on cases assigned to their own hospital."""
+    from app.models.entities import Referral
+    if user.role == "HOSPITAL_STAFF":
+        ref = db.query(Referral).filter(
+            Referral.emergency_id == emergency_id, Referral.status.in_(["ACCEPTED", "COMPLETED"])
+        ).first()
+        if not ref or ref.hospital_id != user.hospital_id:
+            raise HTTPException(status_code=403, detail="Staff can only update cases assigned to their own hospital")
+
+@router.post("/{emergency_id}/arrived", response_model=dict)
+def mark_arrived(emergency_id: str, db: Session = Depends(get_db), current_user = Depends(require_hospital_staff)):
+    from app.services.referral_service import referral_service
+    _authorize_case_action(db, emergency_id, current_user)
+    try:
+        emergency = referral_service.mark_arrived(db, emergency_id, actor=f"STAFF:{current_user.username}")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not emergency:
+        raise HTTPException(status_code=404, detail="Emergency not found")
+    return {"emergency_id": emergency.id, "status": emergency.status}
+
+@router.post("/{emergency_id}/close", response_model=dict)
+def close_emergency(emergency_id: str, db: Session = Depends(get_db), current_user = Depends(require_hospital_staff)):
+    """Closes the case and releases its beds back to the hospital."""
+    from app.services.referral_service import referral_service
+    _authorize_case_action(db, emergency_id, current_user)
+    try:
+        emergency = referral_service.close_case(db, emergency_id, actor=f"STAFF:{current_user.username}")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not emergency:
+        raise HTTPException(status_code=404, detail="Emergency not found")
+    return {"emergency_id": emergency.id, "status": emergency.status}
 
 @router.post("/{emergency_id}/analyse", response_model=AIAnalysisResult)
 async def analyse_emergency(emergency_id: str, db: Session = Depends(get_db)):

@@ -1,0 +1,1544 @@
+[
+  {
+    "id": "hosp_lagos_central",
+    "name": "SIMULATED HOSPITAL \u2014 Lagos Central Trauma Centre",
+    "address": "Broad Street, Lagos Island",
+    "latitude": 6.455,
+    "longitude": 3.3841,
+    "phone": "+234 1 200 0001",
+    "emergency_status": "OPEN",
+    "overall_capacity": 72,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-007",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-008",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-009",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-010",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-011",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-012",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_ikeja_general",
+    "name": "SIMULATED HOSPITAL \u2014 Ikeja General Referral",
+    "address": "Oba Akinjobi Way, Ikeja",
+    "latitude": 6.5964,
+    "longitude": 3.3427,
+    "phone": "+234 1 200 0002",
+    "emergency_status": "OPEN",
+    "overall_capacity": 65,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-007",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-008",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-009",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-010",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_lekki_medical",
+    "name": "SIMULATED HOSPITAL \u2014 Lekki Medical Centre",
+    "address": "Admiralty Way, Lekki Phase 1",
+    "latitude": 6.4474,
+    "longitude": 3.4731,
+    "phone": "+234 1 200 0003",
+    "emergency_status": "OPEN",
+    "overall_capacity": 55,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-007",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-008",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_surulere_teaching",
+    "name": "SIMULATED HOSPITAL \u2014 Surulere Teaching Hospital",
+    "address": "Itire Road, Surulere",
+    "latitude": 6.4969,
+    "longitude": 3.3533,
+    "phone": "+234 1 200 0004",
+    "emergency_status": "OPEN",
+    "overall_capacity": 78,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-007",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-008",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-009",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-010",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-011",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-012",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-013",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-014",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_yaba_specialist",
+    "name": "SIMULATED HOSPITAL \u2014 Yaba Specialist Hospital",
+    "address": "Herbert Macaulay Way, Yaba",
+    "latitude": 6.5158,
+    "longitude": 3.3718,
+    "phone": "+234 1 200 0005",
+    "emergency_status": "OPEN",
+    "overall_capacity": 60,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-007",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-008",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_vi_cardiac",
+    "name": "SIMULATED HOSPITAL \u2014 Victoria Island Cardiac Institute",
+    "address": "Ozumba Mbadiwe Way, VI",
+    "latitude": 6.4281,
+    "longitude": 3.4219,
+    "phone": "+234 1 200 0006",
+    "emergency_status": "OPEN",
+    "overall_capacity": 50,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": false,
+        "quantity": 1,
+        "status": "OFFLINE"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_apapa_community",
+    "name": "SIMULATED HOSPITAL \u2014 Apapa Community Hospital",
+    "address": "Creek Road, Apapa",
+    "latitude": 6.4489,
+    "longitude": 3.3594,
+    "phone": "+234 1 200 0007",
+    "emergency_status": "OPEN",
+    "overall_capacity": 70,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": false,
+        "quantity": 1,
+        "status": "OFFLINE"
+      },
+      {
+        "name": "ICU",
+        "available": false,
+        "quantity": 1,
+        "status": "OFFLINE"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      }
+    ]
+  },
+  {
+    "id": "hosp_ikorodu_general",
+    "name": "SIMULATED HOSPITAL \u2014 Ikorodu General Hospital",
+    "address": "Lagos Road, Ikorodu",
+    "latitude": 6.6194,
+    "longitude": 3.5105,
+    "phone": "+234 1 200 0008",
+    "emergency_status": "OPEN",
+    "overall_capacity": 85,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 0,
+        "status": "UNAVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "OCCUPIED"
+      }
+    ]
+  },
+  {
+    "id": "hosp_maryland_clinic",
+    "name": "SIMULATED HOSPITAL \u2014 Maryland Emergency Clinic",
+    "address": "Ikorodu Road, Maryland",
+    "latitude": 6.572,
+    "longitude": 3.366,
+    "phone": "+234 1 200 0009",
+    "emergency_status": "CLOSED",
+    "overall_capacity": 95,
+    "accepting_emergencies": false,
+    "stale_minutes_ago": 5,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "OCCUPIED"
+      }
+    ]
+  },
+  {
+    "id": "hosp_ajah_memorial",
+    "name": "SIMULATED HOSPITAL \u2014 Ajah Memorial Hospital",
+    "address": "Lekki-Epe Expressway, Ajah",
+    "latitude": 6.4698,
+    "longitude": 3.5852,
+    "phone": "+234 1 200 0010",
+    "emergency_status": "OPEN",
+    "overall_capacity": 58,
+    "accepting_emergencies": true,
+    "stale_minutes_ago": 75,
+    "specialties": [
+      {
+        "name": "General Medicine",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Surgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Orthopaedics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Neurosurgery",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Cardiology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Paediatrics",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Obstetrics/Gynaecology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Anaesthesia",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Dentistry",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Ophthalmology",
+        "count": 2,
+        "status": "AVAILABLE"
+      },
+      {
+        "name": "Trauma",
+        "count": 2,
+        "status": "AVAILABLE"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Emergency Department",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Operating Theatre",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "CT Scanner",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "X-Ray",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ultrasound",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Blood Bank",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "ICU",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      },
+      {
+        "name": "Ambulance",
+        "available": true,
+        "quantity": 1,
+        "status": "OPERATIONAL"
+      }
+    ],
+    "beds": [
+      {
+        "bed_number": "EMG-001",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-002",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-003",
+        "status": "OCCUPIED"
+      },
+      {
+        "bed_number": "EMG-004",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-005",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-006",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-007",
+        "status": "AVAILABLE"
+      },
+      {
+        "bed_number": "EMG-008",
+        "status": "AVAILABLE"
+      }
+    ]
+  }
+]

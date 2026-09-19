@@ -35,8 +35,8 @@ AI-Governor-Hackathon/
 │   │   ├── ai/                                     # Mock/OpenAI/Local LLM providers
 │   │   ├── database/init_db.py                    # Database initialization & seeding
 │   │   └── ...
-│   ├── .venv/                                       # Python virtual environment (python 3.11)
-│   ├── ai_governor.db                               # SQLite database (10 Lagos hospitals)
+│   ├── data/seed/hospitals.json                     # 10 simulated Lagos hospitals (auto-loaded on first start)
+│   ├── ai_governor.db                               # SQLite database (created on first start)
 │   └── tests/                                       # Test suite (20/20 passing)
 ├── frontend/                                         # React + TypeScript + Vite UI
 │   ├── src/
@@ -58,9 +58,6 @@ AI-Governor-Hackathon/
 │   ├── vite.config.ts                             # Vite config with /api proxy + tailwindcss
 │   ├── package.json                                 # Dependencies (React 18, Tailwind v4, Leaflet)
 │   └── dist/                                      # Production build output
-├── data/
-│   └── seed/
-│       └── hospitals.json                         # 10 Lagos hospital seed data with specialties/facilities/beds
 ├── docker/                                           # Docker configuration (if needed)
 └── scripts/                                         # Helper scripts
 ```
@@ -199,7 +196,7 @@ X-Demo-Hospital: hosp_lagos_central
 | `< 15 minutes` | FRESH | No penalty, included in rankings |
 | `15-30 minutes` | AGING | Mild penalty |
 | `30-60 minutes` | STALE | Moderate penalty |
-| `> 60 minutes` | CRITICALLY_STALE | Strongly penalized/excluded from rankings |
+| `> 60 minutes` | CRITICALLY_STALE | Excluded for CRITICAL/HIGH cases, heavily penalized otherwise |
 
 **Every update** (status, capacity, specialists, facilities) creates an audit log entry and refreshes `last_status_update` timestamp.
 
@@ -217,7 +214,7 @@ X-Demo-Hospital: hosp_lagos_central
 
 - **Type:** SQLite (`ai_governor.db`)
 - **Location:** `backend/ai_governor.db`
-- **Seed Data:** `data/seed/hospitals.json` (10 Lagos hospitals)
+- **Seed Data:** `backend/data/seed/hospitals.json` (10 simulated Lagos hospitals; the app refuses to start without it)
 - **Tables:** Hospitals, EmergencyBeds, HospitalSpecialties, HospitalFacilities, Referrals, AuditEvents, GovernatorDecisionEngine state
 
 **To reset simulation to fresh state:**
@@ -423,3 +420,38 @@ This package is ready to be zipped and shared with team members. Each member can
 
 ---
 *AI Governor Hackathon Project - Package generated on 2026-09-18. All systems verified working. Production build confirmed. 20/20 tests passing.*
+
+---
+
+## Workflow & API (current behaviour)
+
+**Real emergency flow:** `POST /api/emergencies` runs the whole pipeline: AI triage -> Governor matching ->
+referral sent to the best eligible hospital. The case ends in `AWAITING_ACCEPTANCE` (hospital alerted) or `NO_MATCH`
+(admins alerted; "Retry dispatch" button in Governor Command).
+
+| Endpoint | Role | Purpose |
+|----------|------|---------|
+| `POST /api/emergencies/{id}/dispatch` | Staff/Admin | Re-score on live data and contact the next untried hospital |
+| `POST /api/emergencies/{id}/arrived` | Staff/Admin | Patient arrived: reserved beds become OCCUPIED |
+| `POST /api/emergencies/{id}/close` | Staff/Admin | Close the case and release its beds |
+| `PATCH /api/hospitals/{id}/beds` | Staff/Admin | Set real bed rows `{total_beds, available_beds}` (reserved beds untouched) |
+| `GET /api/notifications` | Any | Recent alerts (staff only see their own hospital's) |
+| `GET /api/referrals?hospital_id=&status_filter=` | Any | Filtered referral list |
+
+* **Referral timeout:** unanswered referrals expire after `REFERRAL_TIMEOUT_MINUTES` (default 5), become `TIMEOUT`, and fail over automatically.
+* **Failover re-scores every hospital on live data** before choosing the next one.
+* **Accepting needs a free bed** (409 otherwise). One bed is reserved per patient where possible; a shortfall is flagged `PARTIAL`.
+* **`LIMITED` ED status** stays eligible but ranks lower (`LIMITED_STATUS_SCORE_MULTIPLIER`, default 0.85).
+* **Routing:** `ROUTING_PROVIDER=osrm` now works (2s timeout, cached, auto-fallback to the deterministic model).
+
+### Auth
+* Header personas (`X-Demo-Role`, `X-Demo-Hospital`) only work while `DEMO_MODE=true`. `X-Demo-Hospital` picks the hospital of a `HOSPITAL_STAFF` persona.
+* Callers with no token and no header are least-privileged `PATIENT` (they used to default to admin). With `DEMO_MODE=false` a JWT is required.
+* In production a random `SECRET_KEY` is generated unless you set one.
+* CORS: set `CORS_ORIGINS='["https://your-frontend"]'`. localhost and `*.vercel.app` are allowed by default.
+
+### Tests
+```bash
+cd backend && pip install -r requirements.txt && python -m pytest
+```
+Tests use their own `test_ersync.db`, never your dev database.

@@ -4,7 +4,7 @@ from typing import List
 from app.core.config import settings
 from app.database.session import get_db
 from app.models.entities import User
-from app.auth.security import get_current_user, create_access_token, require_admin, require_hospital_staff
+from app.auth.security import get_current_user, create_access_token, require_admin, require_hospital_staff, verify_password
 from app.schemas.schemas import UserLogin, Token, UserResponse, UserCreate
 
 router = APIRouter()
@@ -12,7 +12,7 @@ router = APIRouter()
 @router.post("/token", response_model=Token)
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == login_data.username).first()
-    if not user or not user.verify_password(login_data.password):
+    if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -74,8 +74,9 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
 
 @router.get("/demo-tokens", tags=["Demo"])
 def demo_tokens():
-    """Generate demo tokens for rapid role switching during hackathon"""
-    from app.auth.security import get_password_hash
+    """Generate demo tokens for rapid role switching (only available when DEMO_MODE is on)"""
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
     
     # Generate tokens for all three demo roles
     admin_token = create_access_token(data={"sub": "admin"})

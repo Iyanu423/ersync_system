@@ -82,7 +82,7 @@ class GovernorDecisionEngine:
                 last_up = last_up.replace(tzinfo=timezone.utc)
             elapsed_minutes = (now - last_up).total_seconds() / 60.0
             
-            if elapsed_minutes > settings.EXCLUDE_CRITICALLY_STALE_MINUTES and emergency.severity == "CRITICAL":
+            if elapsed_minutes > settings.EXCLUDE_CRITICALLY_STALE_MINUTES and emergency.severity in ("CRITICAL", "HIGH"):
                 eval_res.eligible = False
                 eval_res.rejection_reasons.append(f"Hospital status data is critically stale ({int(elapsed_minutes)}m since last update)")
 
@@ -136,11 +136,19 @@ class GovernorDecisionEngine:
                 eval_res.positive_factors.append(f"{available_beds} emergency bed(s) available")
             eval_res.positive_factors.append(f"Estimated travel time is {eval_res.eta_minutes} min ({eval_res.distance_km} km)")
 
+            final_score = breakdown["final_score"]
+            # LIMITED ED status = reduced capacity: still eligible, but ranked lower
+            if hosp.emergency_status == "LIMITED":
+                final_score = round(final_score * settings.LIMITED_STATUS_SCORE_MULTIPLIER, 1)
+                breakdown["final_score"] = final_score
+                breakdown["limited_status_multiplier"] = settings.LIMITED_STATUS_SCORE_MULTIPLIER
+                eval_res.positive_factors.append("Emergency department is operating at LIMITED capacity (score reduced)")
+
             breakdown["explanations"] = eval_res.positive_factors if eval_res.eligible else eval_res.rejection_reasons
 
             eval_res.score_breakdown = breakdown
             # If ineligible, final score is zeroed out for clean ranking separation
-            eval_res.final_score = breakdown["final_score"] if eval_res.eligible else 0.0
+            eval_res.final_score = final_score if eval_res.eligible else 0.0
 
             candidates.append(eval_res)
 

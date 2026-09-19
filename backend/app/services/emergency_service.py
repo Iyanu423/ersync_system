@@ -1,4 +1,5 @@
 import random
+import time
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
@@ -126,6 +127,7 @@ class EmergencyService:
         db: Session,
         emergency_id: str
     ) -> List[Match]:
+        started = time.perf_counter()
         emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
         if not emergency:
             return []
@@ -190,6 +192,34 @@ class EmergencyService:
             
         db.commit()
         db.refresh(emergency)
+
+        audit_service.log(
+            db=db, action="MATCHING_COMPLETED", entity_type="EMERGENCY", entity_id=emergency.id,
+            actor="GOVERNOR_DECISION_ENGINE",
+            metadata={
+                "duration_ms": round((time.perf_counter() - started) * 1000.0, 1),
+                "hospitals_evaluated": len(created_matches),
+                "eligible": len(eligible_matches)
+            }
+        )
         return created_matches
+
+    @classmethod
+    async def dispatch_emergency(
+        cls,
+        db: Session,
+        payload: EmergencyCreate,
+        actor: str = "PATIENT_APP"
+    ) -> Tuple[Emergency, AIAnalysisResult]:
+        """
+        Full intake pipeline: AI triage -> Governor matching -> referral to the #1 eligible hospital.
+        Ends in AWAITING_ACCEPTANCE (hospital notified) or NO_MATCH (admins alerted).
+        """
+        from app.services.referral_service import referral_service
+        emergency, ai_result = await cls.create_and_triage(db, payload, actor=actor)
+        cls.match_hospitals(db, emergency.id)
+        referral_service.request_acceptance(db, emergency.id)
+        db.refresh(emergency)
+        return emergency, ai_result
 
 emergency_service = EmergencyService()

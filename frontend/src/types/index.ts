@@ -133,6 +133,7 @@ export interface Referral {
   reservation_expiry?: string;
   eta_minutes: number;
   notes?: string;
+  emergency?: Emergency | null;
 }
 
 export interface AuditEvent {
@@ -154,6 +155,7 @@ export interface GovernorStatistics {
   available_beds: number;
   referrals_accepted: number;
   referrals_rejected: number;
+  referrals_timed_out: number;
   reroutes_count: number;
   average_matching_time_ms: number;
   stale_hospitals_count: number;
@@ -191,4 +193,15 @@ export interface OneClickDemoResult {
   eta_minutes: number;
   distance_km: number;
   timeline: DemoStep[];
+}
+
+export interface AppNotification {
+  id: string;
+  recipient_type: 'PATIENT' | 'HOSPITAL' | 'ADMIN' | 'SYSTEM';
+  recipient_id?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  status: string;
+  created_at: string;
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../services/api';
-import type { Hospital, Emergency, Match, Referral, AuditEvent, GovernorStatistics } from '../types';
+import type { Hospital, Emergency, Match, Referral, AuditEvent, GovernorStatistics, AppNotification, UserRole } from '../types';
+import { clockTime } from '../utils/time';
 import { MapComponent } from '../components/MapComponent';
 import { 
   ShieldAlert, 
@@ -19,7 +20,10 @@ import {
   HeartPulse,
   Car,
   MapPin,
-  Check
+  Check,
+  Bell,
+  AlertTriangle,
+  LogIn
 } from 'lucide-react';
 
 interface GovernorCommandPageProps {
@@ -29,19 +33,21 @@ interface GovernorCommandPageProps {
   onOpenExplain: (emergencyId: string) => void;
   onNavigateToHospital: () => void;
   onEmergencyTriggered?: (emergency: Emergency) => void;
+  currentRole?: UserRole;
 }
 
-const DEFAULT_STATS: GovernorStatistics = {
-  total_emergencies: 14,
-  active_emergencies: 3,
-  total_hospitals: 5,
-  hospitals_accepting: 5,
-  total_beds: 42,
-  available_beds: 18,
-  referrals_accepted: 12,
-  referrals_rejected: 2,
-  reroutes_count: 1,
-  average_matching_time_ms: 840.0,
+const EMPTY_STATS: GovernorStatistics = {
+  total_emergencies: 0,
+  active_emergencies: 0,
+  total_hospitals: 0,
+  hospitals_accepting: 0,
+  total_beds: 0,
+  available_beds: 0,
+  referrals_accepted: 0,
+  referrals_rejected: 0,
+  referrals_timed_out: 0,
+  reroutes_count: 0,
+  average_matching_time_ms: 0,
   stale_hospitals_count: 0
 };
 
@@ -87,9 +93,14 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
   activeEmergency,
   onOpenExplain,
   onNavigateToHospital,
-  onEmergencyTriggered
+  onEmergencyTriggered,
+  currentRole = 'ADMIN'
 }) => {
-  const [stats, setStats] = useState<GovernorStatistics>(DEFAULT_STATS);
+  const [stats, setStats] = useState<GovernorStatistics>(EMPTY_STATS);
+  const [liveEmergency, setLiveEmergency] = useState<Emergency | null>(activeEmergency);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [timeline, setTimeline] = useState<AuditEvent[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [activeReferrals, setActiveReferrals] = useState<Referral[]>([]);
@@ -100,16 +111,25 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [statsData, timelineData, referralsData] = await Promise.all([
+      const [statsData, timelineData, referralsData, notifData] = await Promise.all([
         ApiService.getStatistics().catch(() => null),
         ApiService.getTimeline().catch(() => ({ events: [] })),
-        ApiService.getReferrals().catch(() => [])
+        ApiService.getReferrals().catch(() => null),
+        ApiService.getNotifications(8).catch(() => [])
       ]);
-      if (statsData) setStats(statsData);
+      if (!statsData) {
+        setLoadError('Cannot reach the ER-Sync backend. Figures below are not live.');
+      } else {
+        setLoadError(null);
+        setStats(statsData);
+      }
       if (timelineData && timelineData.events) setTimeline(timelineData.events);
       if (referralsData) setActiveReferrals(referralsData);
+      setNotifications(notifData || []);
 
       if (activeEmergency) {
+        const fresh = await ApiService.getEmergency(activeEmergency.id).catch(() => null);
+        if (fresh) setLiveEmergency(fresh);
         const matchRes = await ApiService.getMatches(activeEmergency.id).catch(() => ({ matches: [] }));
         if (matchRes && matchRes.matches) {
           setMatches(matchRes.matches);
@@ -128,10 +148,23 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
   };
 
   useEffect(() => {
+    setLiveEmergency(activeEmergency);
     fetchData();
-    const interval = setInterval(fetchData, 8000);
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, [activeEmergency]);
+
+  const runCaseAction = async (label: string, fn: () => Promise<any>) => {
+    try {
+      await fn();
+      setActionMsg({ ok: true, text: label });
+      fetchData();
+      onRefreshHospitals();
+    } catch (e: any) {
+      setActionMsg({ ok: false, text: e?.message || 'Action failed' });
+    }
+    setTimeout(() => setActionMsg(null), 5000);
+  };
 
   const handleQuickTrigger = async (preset: typeof QUICK_PRESETS[0]) => {
     setIsTriggeringPreset(true);
@@ -150,8 +183,9 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
       }
       fetchData();
       onRefreshHospitals();
-    } catch (e) {
-      console.error('Failed to trigger quick emergency', e);
+    } catch (e: any) {
+      setActionMsg({ ok: false, text: e?.message || 'Failed to trigger emergency' });
+      setTimeout(() => setActionMsg(null), 5000);
     } finally {
       setIsTriggeringPreset(false);
     }
@@ -159,6 +193,18 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      {loadError && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{loadError}</span>
+        </div>
+      )}
+      {actionMsg && (
+        <div className={`p-3 rounded-xl text-xs font-bold border ${actionMsg.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+          {actionMsg.text}
+        </div>
+      )}
+
       {/* 6-Metric KPI Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
@@ -173,7 +219,7 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
 
         <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Match Latency</span>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">{Math.round(stats.average_matching_time_ms)} ms</div>
+          <div className="text-xl sm:text-2xl font-black text-slate-900">{stats.average_matching_time_ms > 0 ? `${Math.round(stats.average_matching_time_ms)} ms` : '—'}</div>
         </div>
 
         <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
@@ -188,7 +234,7 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
 
         <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Failovers</span>
-          <div className="text-xl sm:text-2xl font-black text-amber-600">{stats.referrals_rejected}</div>
+          <div className="text-xl sm:text-2xl font-black text-amber-600">{stats.reroutes_count}</div>
         </div>
       </div>
 
@@ -196,7 +242,7 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column (7 cols): Active Incident & Candidates */}
         <div className="lg:col-span-7 space-y-6">
-          {activeEmergency ? (
+          {activeEmergency && liveEmergency ? (
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
               {/* Emergency Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
@@ -204,23 +250,31 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-black border border-rose-200 flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
-                      {activeEmergency.severity}
+                      {liveEmergency.severity}
                     </span>
                     <span className="text-xs font-mono font-bold text-slate-500">
-                      {activeEmergency.incident_reference}
+                      {liveEmergency.incident_reference}
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                      liveEmergency.status === 'NO_MATCH' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                      liveEmergency.status === 'AWAITING_ACCEPTANCE' || liveEmergency.status === 'REROUTING' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      liveEmergency.status === 'CLOSED' || liveEmergency.status === 'CANCELLED' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                      'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {liveEmergency.status.replace(/_/g, ' ')}
                     </span>
                   </div>
                   <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">
-                    {activeEmergency.category} &bull; {activeEmergency.patient_count} Casualty
+                    {liveEmergency.category} &bull; {liveEmergency.patient_count} Casualty
                   </h2>
                   <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    {activeEmergency.location_name}
+                    {liveEmergency.location_name}
                   </p>
                 </div>
 
                 <button
-                  onClick={() => onOpenExplain(activeEmergency.id)}
+                  onClick={() => onOpenExplain(liveEmergency.id)}
                   className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition self-start cursor-pointer"
                 >
                   <Sliders className="w-3.5 h-3.5" />
@@ -228,10 +282,45 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
                 </button>
               </div>
 
-              {/* Requirements Chips */}
-              {activeEmergency.requirements && activeEmergency.requirements.length > 0 && (
+              {/* Case lifecycle actions */}
+              {(currentRole === 'ADMIN' || currentRole === 'HOSPITAL_STAFF') && (
                 <div className="flex flex-wrap gap-2">
-                  {activeEmergency.requirements.map((req, idx) => (
+                  {liveEmergency.status === 'NO_MATCH' && (
+                    <button
+                      onClick={() => runCaseAction('Re-dispatched on live hospital data', () => ApiService.redispatchEmergency(liveEmergency.id))}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Retry dispatch
+                    </button>
+                  )}
+                  {liveEmergency.status === 'PATIENT_EN_ROUTE' && (
+                    <button
+                      onClick={() => runCaseAction('Patient marked arrived - bed now occupied', () => ApiService.markArrived(liveEmergency.id))}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      <LogIn className="w-3.5 h-3.5" /> Mark patient arrived
+                    </button>
+                  )}
+                  {(liveEmergency.status === 'ARRIVED' || liveEmergency.status === 'PATIENT_EN_ROUTE') && (
+                    <button
+                      onClick={() => runCaseAction('Case closed - bed released', () => ApiService.closeCase(liveEmergency.id))}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Close case &amp; release bed
+                    </button>
+                  )}
+                </div>
+              )}
+              {liveEmergency.status === 'NO_MATCH' && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold">
+                  No eligible hospital right now (all rejected, timed out, or fail a mandatory requirement). Check the audit trail, then retry.
+                </div>
+              )}
+
+              {/* Requirements Chips */}
+              {liveEmergency.requirements && liveEmergency.requirements.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {liveEmergency.requirements.map((req, idx) => (
                     <span
                       key={idx}
                       className="inline-flex items-center gap-1.5 text-xs bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg font-bold"
@@ -295,7 +384,7 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
                               </span>
                             )}
                             <span className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-xs font-black">
-                              {(match.score * 100).toFixed(0)}%
+                              {Math.round(match.score)}
                             </span>
                           </div>
                         </div>
@@ -353,12 +442,12 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
                 <Activity className="w-4 h-4 text-emerald-600" />
                 Live Dispatches &amp; Bed Reservations
               </span>
-              <span className="text-slate-400 font-bold">{activeReferrals.length} Cases</span>
+              <span className="text-slate-400 font-bold">{activeReferrals.filter(r => r.status === 'REQUESTED' || r.status === 'ACCEPTED').length} Active</span>
             </div>
 
-            {activeReferrals.length > 0 ? (
+            {activeReferrals.some(r => r.status === 'REQUESTED' || r.status === 'ACCEPTED') ? (
               <div className="space-y-2">
-                {activeReferrals.slice(0, 4).map((ref) => (
+                {activeReferrals.filter(r => r.status === 'REQUESTED' || r.status === 'ACCEPTED').slice(0, 5).map((ref) => (
                   <div key={ref.id} className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
                     <div>
                       <div className="font-black text-slate-900">{ref.hospital_name || ref.hospital_id}</div>
@@ -366,7 +455,7 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
                     </div>
                     <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
                       ref.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
-                      ref.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
+                      ref.status === 'REJECTED' || ref.status === 'TIMEOUT' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
                     }`}>
                       {ref.status}
                     </span>
@@ -409,14 +498,37 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900 truncate">{(evt as any).event_type || evt.action}</span>
                       <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-1">
-                        {new Date(evt.created_at || (evt as any).timestamp || Date.now()).toLocaleTimeString()}
+                        {clockTime(evt.created_at || (evt as any).timestamp)}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">{evt.action || (evt as any).description}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">{(evt.metadata as any)?.hospital_name || (evt.metadata as any)?.reason || (evt.metadata as any)?.trigger || evt.entity_type}</p>
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Dispatch notifications */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
+            <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900">
+              <Bell className="w-4 h-4 text-slate-500" />
+              Alerts &amp; Notifications
+            </div>
+            {notifications.length > 0 ? (
+              <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                {notifications.map((n) => (
+                  <div key={n.id} className="text-xs pb-2 border-b border-slate-100 last:border-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-slate-900 truncate">{n.title}</span>
+                      <span className="text-[10px] text-slate-400 font-mono shrink-0">{clockTime(n.created_at)}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{n.message}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 py-2 text-center font-medium">No alerts yet.</div>
+            )}
           </div>
         </div>
       </div>

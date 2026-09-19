@@ -10,17 +10,19 @@ from app.schemas.schemas import GovernorStatistics
 from app.auth.security import get_current_user, require_admin
 from app.governor.scoring import GovernorScoring
 from datetime import datetime, timezone
+from app.services.referral_service import referral_service, ACTIVE_EMERGENCY_STATUSES
 
 router = APIRouter()
 
 @router.get("/active", response_model=dict)
 def get_active_emergencies(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    referral_service.expire_stale_referrals(db)
     active_emergencies = db.query(Emergency).filter(
-        Emergency.status.in_(["ANALYSING", "MATCHING", "AWAITING_ACCEPTANCE", "PATIENT_EN_ROUTE", "REROUTING"])
+        Emergency.status.in_(ACTIVE_EMERGENCY_STATUSES)
     ).order_by(Emergency.reported_at.desc()).all()
     
     active_referrals = db.query(Referral).filter(
-        Referral.status.in_(["REQUESTED", "ACCEPTED", "PATIENT_EN_ROUTE"])
+        Referral.status.in_(["REQUESTED", "ACCEPTED"])
     ).all()
     
     return {
@@ -50,7 +52,7 @@ def get_active_emergencies(db: Session = Depends(get_db), current_user = Depends
 def get_governor_statistics(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     total_emergencies = db.query(func.count(Emergency.id)).scalar() or 0
     active_emergencies = db.query(func.count(Emergency.id)).filter(
-        Emergency.status.in_(["ANALYSING", "MATCHING", "AWAITING_ACCEPTANCE", "PATIENT_EN_ROUTE", "REROUTING"])
+        Emergency.status.in_(ACTIVE_EMERGENCY_STATUSES)
     ).scalar() or 0
     
     total_hospitals = db.query(func.count(Hospital.id)).scalar() or 0
@@ -59,17 +61,19 @@ def get_governor_statistics(db: Session = Depends(get_db), current_user = Depend
     total_beds = db.query(func.count(EmergencyBed.id)).scalar() or 0
     available_beds = db.query(func.count(EmergencyBed.id)).filter(EmergencyBed.status == "AVAILABLE").scalar() or 0
     
-    referrals_accepted = db.query(func.count(Referral.id)).filter(Referral.status == "ACCEPTED").scalar() or 0
+    referrals_accepted = db.query(func.count(Referral.id)).filter(Referral.status.in_(["ACCEPTED", "COMPLETED"])).scalar() or 0
     referrals_rejected = db.query(func.count(Referral.id)).filter(Referral.status == "REJECTED").scalar() or 0
-    
-    reroutes = db.query(func.count(AuditLog.id)).filter(AuditLog.action == "FAILOVER_TRIGGERED").scalar() or 0
-    
-    # Average matching time
-    match_audits = db.query(AuditLog).filter(AuditLog.action.in_(["EMERGENCY_REPORTED", "ACCEPTED"])).all()
-    avg_match_ms = 0.0
-    if match_audits:
-        # Simplified: compute average time between emergency creation and acceptance
-        avg_match_ms = 1500.0  # Demo default
+    referrals_timed_out = db.query(func.count(Referral.id)).filter(Referral.status == "TIMEOUT").scalar() or 0
+
+    # Failovers = automatic re-routes after a rejection/timeout, plus manual re-routes
+    reroutes = db.query(func.count(AuditLog.id)).filter(
+        AuditLog.action.in_(["FAILOVER_TRIGGERED", "REROUTE_INITIATED"])
+    ).scalar() or 0
+
+    # Real matching latency: average of the last 100 measured Governor runs
+    recent = db.query(AuditLog).filter(AuditLog.action == "MATCHING_COMPLETED").order_by(AuditLog.created_at.desc()).limit(100).all()
+    durations = [a.metadata_json.get("duration_ms") for a in recent if a.metadata_json and a.metadata_json.get("duration_ms") is not None]
+    avg_match_ms = round(sum(durations) / len(durations), 1) if durations else 0.0
     
     now = datetime.now(timezone.utc)
     stale_threshold = 30  # minutes
@@ -94,6 +98,7 @@ def get_governor_statistics(db: Session = Depends(get_db), current_user = Depend
         available_beds=available_beds,
         referrals_accepted=referrals_accepted,
         referrals_rejected=referrals_rejected,
+        referrals_timed_out=referrals_timed_out,
         reroutes_count=reroutes,
         average_matching_time_ms=avg_match_ms,
         stale_hospitals_count=stale_count

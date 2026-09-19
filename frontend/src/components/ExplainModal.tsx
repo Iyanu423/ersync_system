@@ -130,7 +130,7 @@ export const ExplainModal: React.FC<ExplainModalProps> = ({ isOpen, onClose, dat
                         <span>ETA: <strong className="text-slate-900">{hosp.eta_minutes}m</strong> ({hosp.distance_km} km)</span>
                       </div>
                       <div className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg font-bold border border-slate-200">
-                        Score: {(hosp.score * 100).toFixed(1)}/100
+                        Score: {hosp.score.toFixed(1)}/100
                       </div>
                     </div>
                   </div>
@@ -140,23 +140,23 @@ export const ExplainModal: React.FC<ExplainModalProps> = ({ isOpen, onClose, dat
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-slate-100 text-[11px]">
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                         <div className="text-slate-500 text-[10px]">Capability (40%)</div>
-                        <div className="font-bold text-slate-900">{(hosp.score_breakdown.capability_score * 100).toFixed(0)}%</div>
+                        <div className="font-bold text-slate-900">{Math.round(hosp.score_breakdown.capability_score)}%</div>
                       </div>
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                         <div className="text-slate-500 text-[10px]">ETA Proximity (30%)</div>
-                        <div className="font-bold text-slate-900">{(hosp.score_breakdown.eta_score * 100).toFixed(0)}%</div>
+                        <div className="font-bold text-slate-900">{Math.round(hosp.score_breakdown.eta_score)}%</div>
                       </div>
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                         <div className="text-slate-500 text-[10px]">Bed Capacity (15%)</div>
-                        <div className="font-bold text-slate-900">{(hosp.score_breakdown.capacity_score * 100).toFixed(0)}%</div>
+                        <div className="font-bold text-slate-900">{Math.round(hosp.score_breakdown.capacity_score)}%</div>
                       </div>
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                         <div className="text-slate-500 text-[10px]">Specialists (10%)</div>
-                        <div className="font-bold text-slate-900">{(hosp.score_breakdown.specialist_score * 100).toFixed(0)}%</div>
+                        <div className="font-bold text-slate-900">{Math.round(hosp.score_breakdown.specialist_score)}%</div>
                       </div>
                       <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                         <div className="text-slate-500 text-[10px]">Freshness (5%)</div>
-                        <div className="font-bold text-slate-900">{(hosp.score_breakdown.freshness_score * 100).toFixed(0)}%</div>
+                        <div className="font-bold text-slate-900">{Math.round(hosp.score_breakdown.freshness_score)}%</div>
                       </div>
                     </div>
                   )}

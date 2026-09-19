@@ -57,7 +57,7 @@ def make_hospital_stale(
 @router.post("/reset", response_model=dict)
 def reset_simulation(db: Session = Depends(get_db), current_user = Depends(require_admin)):
     """Reseed all simulation data to fresh initial state"""
-    from app.database.init_db import init_db
+    from app.database.init_db import get_seed_path
     
     # Reset only hospital telemetry (not erase emergencies/referrals for audit continuity)
     from app.models.entities import Hospital, EmergencyBed, HospitalSpecialty, HospitalFacility
@@ -67,9 +67,16 @@ def reset_simulation(db: Session = Depends(get_db), current_user = Depends(requi
     # Clear beds and rebuild from seed file
     hospitals = db.query(Hospital).all()
     
-    seed_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "data", "seed", "hospitals.json"))
+    seed_path = get_seed_path()
     if not os.path.exists(seed_path):
-        return {"status": "error", "message": "Seed file not found"}
+        raise HTTPException(status_code=500, detail=f"Hospital seed file not found at {seed_path}")
+
+    # Close out any live cases so nothing is left pointing at rebuilt beds
+    from app.models.entities import Emergency, Referral
+    from app.services.referral_service import ACTIVE_EMERGENCY_STATUSES
+    db.query(Referral).filter(Referral.status.in_(["REQUESTED", "ACCEPTED"])).update({"status": "CANCELLED"}, synchronize_session=False)
+    db.query(Emergency).filter(Emergency.status.in_(ACTIVE_EMERGENCY_STATUSES)).update({"status": "CANCELLED"}, synchronize_session=False)
+    db.flush()
     
     with open(seed_path, "r", encoding="utf-8") as f:
         hospitals_data = json.load(f)
@@ -111,4 +118,4 @@ def reset_simulation(db: Session = Depends(get_db), current_user = Depends(requi
     
     db.commit()
     
-    return {"status": "reset", "message": "Simulation telemetry reset to fresh seed state"}
+    return {"status": "reset", "message": "Hospitals reset to seed state; live cases cancelled"}

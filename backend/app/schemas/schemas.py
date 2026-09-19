@@ -83,6 +83,11 @@ class HospitalUpdateStatus(BaseModel):
 class HospitalUpdateCapacity(BaseModel):
     overall_capacity: float = Field(..., ge=0.0, le=100.0)
 
+class HospitalUpdateBeds(BaseModel):
+    """Set the real emergency bed rows. Reserved beds are never touched."""
+    total_beds: int = Field(..., ge=0, le=500)
+    available_beds: int = Field(..., ge=0, le=500)
+
 class HospitalUpdateSpecialist(BaseModel):
     specialty_name: str
     available_count: int
@@ -289,6 +294,7 @@ class GovernorStatistics(BaseModel):
     available_beds: int = 0
     referrals_accepted: int = 0
     referrals_rejected: int = 0
+    referrals_timed_out: int = 0
     reroutes_count: int = 0
     average_matching_time_ms: float = 0.0
     stale_hospitals_count: int = 0

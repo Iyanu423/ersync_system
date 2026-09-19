@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database.session import get_db
-from app.models.entities import Hospital, HospitalSpecialty, HospitalFacility, EmergencyBed
+from app.models.entities import Hospital, HospitalSpecialty, HospitalFacility, EmergencyBed, utc_now
 from app.schemas.schemas import (
     HospitalResponse, HospitalDetailResponse, HospitalCreate,
     HospitalUpdateStatus, HospitalUpdateCapacity, HospitalUpdateSpecialist,
-    HospitalUpdateFacility, SpecialtyItem, FacilityItem
+    HospitalUpdateFacility, HospitalUpdateBeds, SpecialtyItem, FacilityItem
 )
 from app.auth.security import get_current_user, require_hospital_staff, require_admin
 from app.services.hospital_service import hospital_service
@@ -156,3 +156,62 @@ def update_facility(
     if not fac:
         raise HTTPException(status_code=404, detail="Facility not found")
     return FacilityItem(id=fac.id, facility_name=fac.facility_name, available=fac.available, quantity=fac.quantity, status=fac.status)
+
+@router.patch("/{hospital_id}/beds", response_model=HospitalResponse)
+def update_hospital_beds(
+    hospital_id: str, payload: HospitalUpdateBeds,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_hospital_staff)
+):
+    """
+    Sets the real emergency bed rows (what the Governor counts), not just a percentage.
+    RESERVED beds belong to live cases and are never removed or flipped.
+    """
+    from app.services.audit_service import audit_service
+    if current_user.role == "HOSPITAL_STAFF" and current_user.hospital_id != hospital_id:
+        raise HTTPException(status_code=403, detail="Staff can only modify their own hospital")
+
+    hosp = hospital_service.get_by_id(db, hospital_id)
+    if not hosp:
+        raise HTTPException(status_code=404, detail="Hospital not found")
+
+    beds = db.query(EmergencyBed).filter(EmergencyBed.hospital_id == hospital_id).all()
+    reserved = [b for b in beds if b.status == "RESERVED"]
+    total = max(payload.total_beds, len(reserved))
+
+    # Grow / shrink the number of beds (shrink drops AVAILABLE first, then OCCUPIED; never RESERVED)
+    if len(beds) < total:
+        used = {b.bed_number for b in beds}
+        n = 1
+        for _ in range(total - len(beds)):
+            while f"EMG-{n:03d}" in used:
+                n += 1
+            used.add(f"EMG-{n:03d}")
+            db.add(EmergencyBed(hospital_id=hospital_id, bed_number=f"EMG-{n:03d}", status="AVAILABLE"))
+        db.flush()
+    elif len(beds) > total:
+        removable = sorted([b for b in beds if b.status != "RESERVED"], key=lambda b: (b.status != "AVAILABLE", b.bed_number))
+        for b in removable[: len(beds) - total]:
+            db.delete(b)
+        db.flush()
+
+    beds = db.query(EmergencyBed).filter(EmergencyBed.hospital_id == hospital_id).order_by(EmergencyBed.bed_number).all()
+    free_pool = [b for b in beds if b.status != "RESERVED"]
+    available = min(payload.available_beds, len(free_pool))
+    for i, b in enumerate(free_pool):
+        b.status = "AVAILABLE" if i < available else "OCCUPIED"
+        b.reserved_for = None
+        b.updated_at = utc_now()
+
+    total_now = len(beds)
+    free_now = sum(1 for b in beds if b.status == "AVAILABLE")
+    hosp.overall_capacity = round(((total_now - free_now) / total_now) * 100.0, 1) if total_now else 100.0
+    hosp.last_status_update = utc_now()
+    db.commit()
+    db.refresh(hosp)
+
+    audit_service.log(
+        db=db, action="HOSPITAL_BEDS_UPDATED", entity_type="HOSPITAL", entity_id=hosp.id,
+        actor=f"STAFF:{current_user.username}", metadata={"total_beds": total_now, "available_beds": free_now}
+    )
+    return _format_hospital(hosp)
