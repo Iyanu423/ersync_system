@@ -93,15 +93,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink min-w-0">
         {/* Hospital selector when on hospital tab */}
         {activeTab === 'hospital' && hospitals.length > 0 && onSelectHospitalId && (
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs min-w-0 shrink">
             <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0 stroke-[2.5]" />
             <select
               value={selectedHospitalId}
               onChange={(e) => onSelectHospitalId(e.target.value)}
-              className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer max-w-[130px] sm:max-w-[190px] truncate text-xs"
+              className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer w-full max-w-[40vw] sm:max-w-[250px] truncate text-xs min-w-0"
             >
               {hospitals.map(h => (
                 <option key={h.id} value={h.id}>
@@ -128,20 +128,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
         )}
 
-        {/* Role Persona Switcher */}
-        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
-          <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0 stroke-[2.5]" />
-          <select
-            value={currentRole}
-            onChange={handleRoleChange}
-            aria-label="User Persona"
-            className="bg-transparent text-slate-900 font-black outline-none cursor-pointer text-xs"
-          >
-            <option value="ADMIN">Admin (State EOC)</option>
-            <option value="HOSPITAL_STAFF">Hospital Staff</option>
-            <option value="PATIENT">Responder / Patient</option>
-          </select>
-        </div>
+
       </div>
     </header>
   );
