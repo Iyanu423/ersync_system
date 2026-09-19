@@ -214,6 +214,25 @@ export const HospitalDashboardPage: React.FC<HospitalDashboardPageProps> = ({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Mobile-only Hospital Selector */}
+      <div className="sm:hidden">
+        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Select Facility</label>
+        <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-xl text-sm shadow-xs">
+          <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+          <select
+            value={selectedHospitalId}
+            onChange={(e) => onSelectHospitalId(e.target.value)}
+            className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer w-full truncate"
+          >
+            {hospitals.map(h => (
+              <option key={h.id} value={h.id}>
+                {h.name.replace('SIMULATED HOSPITAL — ', '')}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Toast Notification */}
       {saveToast && (
         <div className={`fixed bottom-6 right-6 z-50 text-white px-4 py-2.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-2 max-w-sm ${toastIsError ? 'bg-rose-700 border-rose-500' : 'bg-slate-900 border-slate-700'}`}>

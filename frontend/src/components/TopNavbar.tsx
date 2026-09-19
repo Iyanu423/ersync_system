@@ -96,7 +96,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       <div className="flex items-center gap-2 sm:gap-3 shrink min-w-0">
         {/* Hospital selector when on hospital tab */}
         {activeTab === 'hospital' && hospitals.length > 0 && onSelectHospitalId && (
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs min-w-0 shrink">
+          <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs min-w-0 shrink">
             <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0 stroke-[2.5]" />
             <select
               value={selectedHospitalId}
