@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 from app.database.session import get_db
@@ -11,13 +11,14 @@ from app.auth.security import get_current_user, require_hospital_staff
 router = APIRouter()
 
 @router.post("", response_model=EmergencyResponse, status_code=status.HTTP_201_CREATED)
-async def create_emergency(payload: EmergencyCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+async def create_emergency(payload: EmergencyCreate, request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     # Full pipeline: AI triage -> Governor matching -> referral sent to the best eligible hospital
-    emergency, ai_result = await emergency_service.dispatch_emergency(db, payload, actor=f"USER:{current_user.username if current_user else 'anonymous'}")
+    target_hospital_id = request.headers.get("x-demo-hospital")
+    emergency, ai_result = await emergency_service.dispatch_emergency(db, payload, actor=f"USER:{current_user.username if current_user else 'anonymous'}", target_hospital_id=target_hospital_id)
     return await _format_emergency(db, emergency, ai_result)
 
 @router.post("/{emergency_id}/dispatch", response_model=dict)
-async def redispatch_emergency(emergency_id: str, db: Session = Depends(get_db), current_user = Depends(require_hospital_staff)):
+async def redispatch_emergency(emergency_id: str, request: Request, db: Session = Depends(get_db), current_user = Depends(require_hospital_staff)):
     """Re-run matching on live hospital data and contact the best hospital not yet tried (e.g. after NO_MATCH)."""
     from app.services.referral_service import referral_service
     emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
@@ -25,7 +26,8 @@ async def redispatch_emergency(emergency_id: str, db: Session = Depends(get_db),
         raise HTTPException(status_code=404, detail="Emergency not found")
     if emergency.status in ("CLOSED", "CANCELLED", "ARRIVED"):
         raise HTTPException(status_code=409, detail=f"Emergency is already {emergency.status}")
-    emergency_service.match_hospitals(db, emergency_id)
+    target_hospital_id = request.headers.get("x-demo-hospital")
+    emergency_service.match_hospitals(db, emergency_id, target_hospital_id=target_hospital_id)
     referral = referral_service.request_acceptance(db, emergency_id)
     db.refresh(emergency)
     return {

@@ -125,7 +125,8 @@ class EmergencyService:
     def match_hospitals(
         cls,
         db: Session,
-        emergency_id: str
+        emergency_id: str,
+        target_hospital_id: Optional[str] = None
     ) -> List[Match]:
         started = time.perf_counter()
         emergency = db.query(Emergency).filter(Emergency.id == emergency_id).first()
@@ -137,7 +138,7 @@ class EmergencyService:
         db.commit()
 
         # Run Governor Decision Engine
-        candidates = GovernorDecisionEngine.evaluate_emergency(db, emergency)
+        candidates = GovernorDecisionEngine.evaluate_emergency(db, emergency, target_hospital_id=target_hospital_id)
 
         created_matches: List[Match] = []
         for cand in candidates:
@@ -209,7 +210,8 @@ class EmergencyService:
         cls,
         db: Session,
         payload: EmergencyCreate,
-        actor: str = "PATIENT_APP"
+        actor: str = "PATIENT_APP",
+        target_hospital_id: Optional[str] = None
     ) -> Tuple[Emergency, AIAnalysisResult]:
         """
         Full intake pipeline: AI triage -> Governor matching -> referral to the #1 eligible hospital.
@@ -217,7 +219,7 @@ class EmergencyService:
         """
         from app.services.referral_service import referral_service
         emergency, ai_result = await cls.create_and_triage(db, payload, actor=actor)
-        cls.match_hospitals(db, emergency.id)
+        cls.match_hospitals(db, emergency.id, target_hospital_id=target_hospital_id)
         referral_service.request_acceptance(db, emergency.id)
         db.refresh(emergency)
         return emergency, ai_result

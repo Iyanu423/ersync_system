@@ -31,10 +31,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navItems = [
     {
+      category: "INTAKE",
+      items: [
+        { id: 'intake', label: 'Submit an Emergency', icon: Activity },
+      ]
+    },
+    {
       category: "OPERATIONS",
       items: [
         { id: 'command', label: 'Command Center', icon: Layers },
-        { id: 'intake', label: 'Emergency Intake', icon: Activity },
         { id: 'network', label: 'Geospatial Grid', icon: MapPin },
         { id: 'analytics', label: 'Analytics & KPIs', icon: BarChart3 },
       ]

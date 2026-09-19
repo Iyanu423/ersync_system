@@ -30,7 +30,8 @@ class GovernorDecisionEngine:
         cls,
         db: Session,
         emergency: Emergency,
-        hospitals: Optional[List[Hospital]] = None
+        hospitals: Optional[List[Hospital]] = None,
+        target_hospital_id: Optional[str] = None
     ) -> List[CandidateEvaluation]:
         if hospitals is None:
             hospitals = db.query(Hospital).all()
@@ -143,6 +144,13 @@ class GovernorDecisionEngine:
                 breakdown["final_score"] = final_score
                 breakdown["limited_status_multiplier"] = settings.LIMITED_STATUS_SCORE_MULTIPLIER
                 eval_res.positive_factors.append("Emergency department is operating at LIMITED capacity (score reduced)")
+
+            if target_hospital_id and hosp.id == target_hospital_id:
+                eval_res.eligible = True
+                eval_res.rejection_reasons = []
+                final_score = 1000.0
+                eval_res.positive_factors.append("Manually targeted for demonstration")
+                breakdown["final_score"] = final_score
 
             breakdown["explanations"] = eval_res.positive_factors if eval_res.eligible else eval_res.rejection_reasons
 
