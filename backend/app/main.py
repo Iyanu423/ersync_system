@@ -5,8 +5,10 @@ from app.database.session import engine
 from app.models import entities
 from app.api import api_router
 
-# Create database tables
-entities.Base.metadata.create_all(bind=engine)
+from app.database.init_db import init_db
+
+# Create database tables and auto-seed if empty
+init_db()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

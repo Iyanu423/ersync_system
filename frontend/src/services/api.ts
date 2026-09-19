@@ -9,7 +9,8 @@ import type {
   UserRole
 } from '../types';
 
-const API_BASE = '/api';
+const rawBase = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase.replace(/\/$/, '')}/api`;
 
 export class ApiService {
   private static currentRole: UserRole = 'ADMIN';
