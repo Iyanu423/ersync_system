@@ -74,3 +74,12 @@ export function lifecycleIndex(status?: string): number {
     default: return -1;
   }
 }
+
+/** "Nurse Chioma Okoro (Lagos Central Triage Lead)" → { name, title } */
+export function parseFullName(full?: string | null) {
+  const m = (full || '').match(/^(.*?)\s*\((.*)\)\s*$/);
+  return { name: (m ? m[1] : full || '').trim() || 'User', title: (m ? m[2] : '').trim() };
+}
+
+export const initials = (name: string) =>
+  name.replace(/^(Dr\.?|Nurse|Mr\.?|Mrs\.?|Ms\.?|Prof\.?)\s+/i, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || 'U';

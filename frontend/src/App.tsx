@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Hospital, Emergency, OneClickDemoResult } from './types';
+import type { Hospital, Emergency, OneClickDemoResult, AuthUser } from './types';
 import { ApiService } from './services/api';
 import { Sidebar } from './components/Sidebar';
 import { TopNavbar } from './components/TopNavbar';
 import { BottomNav } from './components/BottomNav';
-import { WorkspaceGate } from './components/WorkspaceGate';
+import { AccountModal } from './components/AccountModal';
+import { LoginPage } from './pages/LoginPage';
+import { BrandMark } from './components/Sidebar';
 import { ExplainModal } from './components/ExplainModal';
 import { EmergencyIntakePage } from './pages/EmergencyIntakePage';
 import { GovernorCommandPage } from './pages/GovernorCommandPage';
@@ -18,27 +20,21 @@ import { DemoPage } from './pages/DemoPage';
 import { WorkspaceContext } from './ui/WorkspaceContext';
 import { useConfirm, useToast } from './ui/UIProvider';
 import { Alert } from './ui/primitives';
-import { WifiOff, RotateCcw } from 'lucide-react';
-import { canAccess, defaultTab, readWorkspace, saveWorkspace, ROLE_META, type TabId, type Workspace } from './config/workspace';
-import { cleanName } from './utils/format';
+import { WifiOff, RotateCcw, LogOut } from 'lucide-react';
+import { canAccess, defaultTab, type TabId } from './config/workspace';
+import { cleanName, parseFullName } from './utils/format';
 
 const DEFAULT_HOSPITAL = 'hosp_lagos_central';
 
-function App() {
+function AuthedApp({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const toast = useToast();
   const confirm = useConfirm();
 
-  // Workspace (role + hospital) — restored from storage, otherwise the gate asks.
-  const [workspace, setWorkspace] = useState<Workspace | null>(() => {
-    const ws = readWorkspace();
-    ApiService.setRole(ws?.role ?? 'ADMIN', ws?.hospitalId ?? DEFAULT_HOSPITAL);
-    return ws;
-  });
-  const [gateOpen, setGateOpen] = useState<boolean>(() => readWorkspace() === null);
-
-  const role = workspace?.role ?? 'ADMIN';
-  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(workspace?.hospitalId ?? DEFAULT_HOSPITAL);
-  const [activeTab, setActiveTab] = useState<TabId>(() => defaultTab(workspace?.role ?? 'ADMIN'));
+  const role = user.role;
+  // Staff are bound to their own hospital by the server; admins can browse any facility.
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(user.hospital_id || DEFAULT_HOSPITAL);
+  const [activeTab, setActiveTab] = useState<TabId>(() => defaultTab(user.role));
+  const [accountOpen, setAccountOpen] = useState(false);
 
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [activeEmergency, setActiveEmergency] = useState<Emergency | null>(null);
@@ -104,7 +100,7 @@ function App() {
     refreshBadges();
     const interval = setInterval(refreshBadges, 6000);
     return () => clearInterval(interval);
-  }, [refreshBadges, workspace?.role, workspace?.hospitalId]);
+  }, [refreshBadges]);
 
   /* ── navigation ── */
   const navigate = useCallback((tab: TabId) => {
@@ -118,32 +114,22 @@ function App() {
     if (!canAccess(role, activeTab)) setActiveTab(defaultTab(role));
   }, [role, activeTab]);
 
-  /* ── workspace switching ── */
-  const handleSelectWorkspace = (ws: Workspace) => {
-    ApiService.setRole(ws.role, ws.hospitalId);
-    saveWorkspace(ws);
-    setWorkspace(ws);
-    setSelectedHospitalId(ws.hospitalId);
-    setGateOpen(false);
-    setActiveEmergency(null);
-    setActiveTab(defaultTab(ws.role));
-    setPendingReferrals(0);
-    setUnreadAlerts(0);
-    loadHospitals();
-    const name = ws.role === 'HOSPITAL_STAFF'
-      ? cleanName(hospitals.find((h) => h.id === ws.hospitalId)?.name) || 'your hospital'
-      : ROLE_META[ws.role].label;
-    toast.success(`Switched to ${name}`, { message: ROLE_META[ws.role].tagline });
+  const handleSelectHospital = (id: string) => {
+    if (role === 'HOSPITAL_STAFF') return;
+    setSelectedHospitalId(id);
   };
 
-  const handleSelectHospital = (id: string) => {
-    setSelectedHospitalId(id);
-    ApiService.setRole(role, id);
-    if (role === 'HOSPITAL_STAFF') {
-      const ws = { role, hospitalId: id };
-      saveWorkspace(ws);
-      setWorkspace(ws);
-    }
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: 'Sign out of ER-Sync?',
+      message: 'You will need to sign in again to access your workspace.',
+      confirmLabel: 'Sign out',
+      tone: 'danger',
+      icon: LogOut,
+    });
+    if (!ok) return;
+    setAccountOpen(false);
+    onLogout();
   };
 
   /* ── actions ── */
@@ -210,7 +196,7 @@ function App() {
   };
 
   /* ── derived ── */
-  const workspaceHospital = hospitals.find((h) => h.id === (workspace?.hospitalId ?? selectedHospitalId));
+  const workspaceHospital = hospitals.find((h) => h.id === (user.hospital_id ?? selectedHospitalId));
   const workspaceName = cleanName(workspaceHospital?.name) || 'Your hospital';
   const badges = useMemo(() => ({ referrals: pendingReferrals, notifications: unreadAlerts }), [pendingReferrals, unreadAlerts]);
   const ctx = useMemo(() => ({ role, hospitalId: selectedHospitalId }), [role, selectedHospitalId]);
@@ -219,11 +205,12 @@ function App() {
     <WorkspaceContext.Provider value={ctx}>
       <div className="flex h-dvh overflow-hidden bg-canvas text-ink-900">
         <Sidebar
-          role={role}
+          user={user}
           workspaceName={workspaceName}
           activeTab={activeTab}
           onNavigate={navigate}
-          onSwitchWorkspace={() => setGateOpen(true)}
+          onOpenAccount={() => setAccountOpen(true)}
+          onLogout={handleLogout}
           onResetSimulation={handleResetSimulation}
           badges={badges}
           online={online}
@@ -231,11 +218,11 @@ function App() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <TopNavbar
-            role={role}
+            user={user}
             workspaceName={workspaceName}
             activeTab={activeTab}
             onNavigate={navigate}
-            onSwitchWorkspace={() => setGateOpen(true)}
+            onOpenAccount={() => setAccountOpen(true)}
             unreadCount={unreadAlerts}
             online={online}
             canReport={canAccess(role, 'intake')}
@@ -321,24 +308,76 @@ function App() {
           role={role}
           activeTab={activeTab}
           onNavigate={navigate}
-          onSwitchWorkspace={() => setGateOpen(true)}
+          onOpenAccount={() => setAccountOpen(true)}
+          onLogout={handleLogout}
           onResetSimulation={handleResetSimulation}
           badges={badges}
         />
 
         <ExplainModal isOpen={explainOpen} onClose={() => setExplainOpen(false)} data={explanationData} />
 
-        <WorkspaceGate
-          open={gateOpen}
-          required={workspace === null}
-          current={workspace}
-          hospitals={hospitals}
-          onSelect={handleSelectWorkspace}
-          onClose={() => setGateOpen(false)}
+        <AccountModal
+          open={accountOpen}
+          user={user}
+          hospitalName={user.hospital_id ? workspaceName : undefined}
+          onClose={() => setAccountOpen(false)}
+          onLogout={handleLogout}
         />
       </div>
     </WorkspaceContext.Provider>
   );
+}
+
+function App() {
+  const toast = useToast();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [booting, setBooting] = useState(true);
+
+  // Restore + verify a saved session on launch.
+  useEffect(() => {
+    ApiService.unauthorizedHandler = () => {
+      ApiService.logout();
+      setUser(null);
+      toast.warning('Session expired', { message: 'Please sign in again.' });
+    };
+    const session = ApiService.loadSession();
+    if (!session) { setBooting(false); return; }
+    ApiService.me()
+      .then((u) => {
+        // In demo mode the server answers an expired/invalid token as an anonymous user instead of a 401.
+        // If the identity it reports isn't the one we signed in as, the session is no longer valid.
+        if (u.username !== session.user.username) {
+          ApiService.logout();
+          toast.warning('Session expired', { message: 'Please sign in again.' });
+          return;
+        }
+        setUser(u);
+      })
+      .catch(() => { if (ApiService.isAuthenticated()) setUser(session.user); }) // offline: trust the saved profile
+      .finally(() => setBooting(false));
+    return () => { ApiService.unauthorizedHandler = null; };
+  }, [toast]);
+
+  const handleLoggedIn = (u: AuthUser) => {
+    setUser(u);
+    toast.success(`Welcome, ${parseFullName(u.full_name).name}`, { message: 'You are signed in.' });
+  };
+
+  const handleLogout = () => {
+    ApiService.logout();
+    setUser(null);
+    toast.info('Signed out', { message: 'See you soon.' });
+  };
+
+  if (booting) {
+    return (
+      <div className="side-pattern flex h-dvh items-center justify-center bg-ink-950">
+        <div className="animate-pulse"><BrandMark size={64} /></div>
+      </div>
+    );
+  }
+  if (!user) return <LoginPage onLoggedIn={handleLoggedIn} />;
+  return <AuthedApp key={user.id} user={user} onLogout={handleLogout} />;
 }
 
 export default App;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
-import { ArrowLeftRight, Grid2x2, RotateCcw, Siren, ChevronRight } from 'lucide-react';
+import { Grid2x2, LogOut, RotateCcw, UserRound, Siren, ChevronRight } from 'lucide-react';
 import type { UserRole } from '../types';
 import { navFor, ROLE_META, type NavItem, type TabId } from '../config/workspace';
 import { Modal, IconTile } from '../ui/primitives';
@@ -9,7 +9,8 @@ interface BottomNavProps {
   role: UserRole;
   activeTab: TabId;
   onNavigate: (tab: TabId) => void;
-  onSwitchWorkspace: () => void;
+  onOpenAccount: () => void;
+  onLogout: () => void;
   onResetSimulation: () => void;
   badges: Partial<Record<TabId, number>>;
 }
@@ -24,7 +25,7 @@ const Tab: React.FC<{ item: NavItem; active: boolean; count: number; onClick: ()
   </button>
 );
 
-export const BottomNav: React.FC<BottomNavProps> = ({ role, activeTab, onNavigate, onSwitchWorkspace, onResetSimulation, badges }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({ role, activeTab, onNavigate, onOpenAccount, onLogout, onResetSimulation, badges }) => {
   const [moreOpen, setMoreOpen] = useState(false);
   const items = navFor(role);
   const get = (id: TabId) => items.find((i) => i.id === id)!;
@@ -88,9 +89,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role, activeTab, onNavigat
             </button>
           ))}
           <div className="my-2 h-px bg-ink-100" />
-          <button onClick={() => { setMoreOpen(false); onSwitchWorkspace(); }} className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition hover:bg-ink-25 active:scale-[.98]">
-            <IconTile icon={ArrowLeftRight} tone="info" />
-            <span className="flex-1"><span className="block text-[14px] font-bold text-ink-900">Switch workspace</span><span className="block text-[12px] font-medium text-ink-400">Change role or hospital</span></span>
+          <button onClick={() => { setMoreOpen(false); onOpenAccount(); }} className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition hover:bg-ink-25 active:scale-[.98]">
+            <IconTile icon={UserRound} tone="info" />
+            <span className="flex-1"><span className="block text-[14px] font-bold text-ink-900">Your account</span><span className="block text-[12px] font-medium text-ink-400">Profile and access</span></span>
           </button>
           {role === 'ADMIN' && (
             <button onClick={() => { setMoreOpen(false); onResetSimulation(); }} className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition hover:bg-ink-25 active:scale-[.98]">
@@ -98,6 +99,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role, activeTab, onNavigat
               <span className="flex-1"><span className="block text-[14px] font-bold text-ink-900">Reset demo data</span><span className="block text-[12px] font-medium text-ink-400">Restore hospitals to seed state</span></span>
             </button>
           )}
+          <button onClick={() => { setMoreOpen(false); onLogout(); }} className="flex w-full items-center gap-3.5 rounded-2xl p-3 text-left transition hover:bg-alert-50 active:scale-[.98]">
+            <IconTile icon={LogOut} tone="alert" />
+            <span className="flex-1"><span className="block text-[14px] font-bold text-alert-700">Sign out</span></span>
+          </button>
         </div>
       </Modal>
     </>

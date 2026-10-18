@@ -1,24 +1,27 @@
 import React from 'react';
 import clsx from 'clsx';
 import { Bell, ChevronRight, Siren } from 'lucide-react';
-import type { UserRole } from '../types';
+import type { AuthUser } from '../types';
+import { initials, parseFullName } from '../utils/format';
 import { NAV_ITEMS, ROLE_META, type TabId } from '../config/workspace';
 import { BrandMark } from './Sidebar';
 import { Badge } from '../ui/primitives';
 
 interface TopNavbarProps {
-  role: UserRole;
+  user: AuthUser;
   workspaceName: string;
   activeTab: TabId;
   onNavigate: (tab: TabId) => void;
-  onSwitchWorkspace: () => void;
+  onOpenAccount: () => void;
   unreadCount: number;
   online: boolean;
   canReport: boolean;
 }
 
-export const TopNavbar: React.FC<TopNavbarProps> = ({ role, workspaceName, activeTab, onNavigate, onSwitchWorkspace, unreadCount, online, canReport }) => {
+export const TopNavbar: React.FC<TopNavbarProps> = ({ user, workspaceName, activeTab, onNavigate, onOpenAccount, unreadCount, online, canReport }) => {
+  const role = user.role;
   const meta = ROLE_META[role];
+  const person = parseFullName(user.full_name);
   const page = NAV_ITEMS.find((n) => n.id === activeTab);
 
   return (
@@ -64,16 +67,16 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ role, workspaceName, activ
           </button>
 
           <button
-            onClick={onSwitchWorkspace}
-            className="flex h-10 items-center gap-2.5 rounded-xl border border-ink-100 bg-white pl-1.5 pr-3 transition hover:border-ink-200"
-            aria-label="Switch workspace"
+            onClick={onOpenAccount}
+            className="flex h-10 items-center gap-2.5 rounded-xl border border-ink-100 bg-white pl-1.5 pr-1.5 transition hover:border-ink-200 sm:pr-3"
+            aria-label="Open account menu"
           >
-            <span className={clsx('inline-flex size-7 items-center justify-center rounded-lg', meta.tone === 'signal' ? 'bg-signal-50 text-signal-700' : meta.tone === 'alert' ? 'bg-alert-50 text-alert-600' : 'bg-info-50 text-info-600')}>
-              <meta.icon className="size-4" strokeWidth={2.2} />
+            <span className={clsx('inline-flex size-7 items-center justify-center rounded-lg text-[11px] font-extrabold', meta.tone === 'signal' ? 'bg-signal-50 text-signal-700' : meta.tone === 'alert' ? 'bg-alert-50 text-alert-600' : 'bg-info-50 text-info-600')}>
+              {initials(person.name)}
             </span>
-            <span className="hidden text-left leading-tight sm:block">
-              <span className="block text-[12.5px] font-bold text-ink-900">{meta.short}</span>
-              <span className="block text-[10.5px] font-semibold text-ink-400">Switch</span>
+            <span className="hidden max-w-[150px] text-left leading-tight sm:block">
+              <span className="block truncate text-[12.5px] font-bold text-ink-900">{person.name}</span>
+              <span className="block text-[10.5px] font-semibold text-ink-400">{meta.short}</span>
             </span>
           </button>
         </div>

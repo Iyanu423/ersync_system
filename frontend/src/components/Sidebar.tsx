@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
-import { ArrowLeftRight, ChevronsLeft, ChevronsRight, RotateCcw, Wifi, WifiOff } from 'lucide-react';
-import type { UserRole } from '../types';
+import { ChevronsLeft, ChevronsRight, LogOut, RotateCcw, Wifi, WifiOff } from 'lucide-react';
+import type { AuthUser } from '../types';
+import { initials, parseFullName } from '../utils/format';
 import { navFor, ROLE_META, type TabId } from '../config/workspace';
 
 interface SidebarProps {
-  role: UserRole;
+  user: AuthUser;
   workspaceName: string;
   activeTab: TabId;
   onNavigate: (tab: TabId) => void;
-  onSwitchWorkspace: () => void;
+  onOpenAccount: () => void;
+  onLogout: () => void;
   onResetSimulation: () => void;
   badges: Partial<Record<TabId, number>>;
   online: boolean;
@@ -23,7 +25,7 @@ export const BrandMark: React.FC<{ size?: number; className?: string }> = ({ siz
   </span>
 );
 
-export const Sidebar: React.FC<SidebarProps> = ({ role, workspaceName, activeTab, onNavigate, onSwitchWorkspace, onResetSimulation, badges, online }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, workspaceName, activeTab, onNavigate, onOpenAccount, onLogout, onResetSimulation, badges, online }) => {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
   });
@@ -34,7 +36,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, workspaceName, activeTab
     });
   };
 
+  const role = user.role;
   const meta = ROLE_META[role];
+  const person = parseFullName(user.full_name);
   const items = navFor(role);
   const groups = Array.from(new Set(items.map((i) => i.group)));
 
@@ -59,29 +63,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, workspaceName, activeTab
         )}
       </div>
 
-      {/* Workspace card */}
+      {/* Account card */}
       <div className={clsx('px-4 pb-2', collapsed && 'px-3')}>
         <button
-          onClick={onSwitchWorkspace}
-          title="Switch workspace"
-          className={clsx(
-            'group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-left transition hover:border-white/20 hover:bg-white/[0.09]',
-            collapsed && 'justify-center p-2.5',
-          )}
+          onClick={onOpenAccount}
+          title="Your account"
+          className={clsx('group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-left transition hover:border-white/20 hover:bg-white/[0.09]', collapsed && 'justify-center p-2.5')}
         >
-          <span className={clsx('inline-flex size-9 shrink-0 items-center justify-center rounded-xl',
+          <span className={clsx('inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-extrabold',
             meta.tone === 'signal' ? 'bg-signal-400/20 text-signal-300' : meta.tone === 'alert' ? 'bg-alert-400/20 text-alert-300' : 'bg-info-500/25 text-info-200')}>
-            <meta.icon className="size-[18px]" strokeWidth={2.1} />
+            {initials(person.name)}
           </span>
           {!collapsed && (
-            <>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[10px] font-bold uppercase tracking-[.1em] text-ink-300/70">Workspace</span>
-                <span className="block truncate text-[13.5px] font-bold">{role === 'HOSPITAL_STAFF' ? workspaceName : meta.label}</span>
-                <span className="block truncate text-[11.5px] font-medium text-ink-300/70">{role === 'HOSPITAL_STAFF' ? meta.label : meta.tagline}</span>
-              </span>
-              <ArrowLeftRight className="size-4 shrink-0 text-ink-300/60 transition group-hover:text-white" />
-            </>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13.5px] font-bold">{person.name}</span>
+              <span className="block truncate text-[11.5px] font-medium text-ink-300/70">{role === 'HOSPITAL_STAFF' ? workspaceName : meta.label}</span>
+            </span>
           )}
         </button>
       </div>
@@ -140,6 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ role, workspaceName, activeTab
               {!collapsed && 'Reset demo'}
             </button>
           )}
+          <button onClick={onLogout} title="Sign out" className="flex size-9 items-center justify-center rounded-xl bg-white/[0.06] text-ink-300 transition hover:bg-alert-500/25 hover:text-alert-200"><LogOut className="size-4" /></button>
           <button onClick={toggle} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} className="flex size-9 items-center justify-center rounded-xl bg-white/[0.06] text-ink-300 transition hover:bg-white/[0.12] hover:text-white">
             {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
           </button>

@@ -72,26 +72,3 @@ export const ROLE_META: Record<UserRole, RoleMeta> = {
     tone: 'alert',
   },
 };
-
-export interface Workspace {
-  role: UserRole;
-  hospitalId: string;
-}
-
-const KEY = 'ersync.workspace.v1';
-
-export function readWorkspace(): Workspace | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && ['ADMIN', 'HOSPITAL_STAFF', 'PATIENT'].includes(parsed.role)) {
-      return { role: parsed.role, hospitalId: parsed.hospitalId || 'hosp_lagos_central' };
-    }
-  } catch { /* storage unavailable */ }
-  return null;
-}
-
-export function saveWorkspace(ws: Workspace) {
-  try { localStorage.setItem(KEY, JSON.stringify(ws)); } catch { /* ignore */ }
-}

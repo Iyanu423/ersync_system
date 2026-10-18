@@ -7,15 +7,72 @@ import type {
   AuditEvent,
   OneClickDemoResult,
   AppNotification,
-  UserRole
+  UserRole,
+  AuthUser
 } from '../types';
 
 const rawBase = import.meta.env.VITE_API_BASE_URL || '/api';
 const API_BASE = rawBase.endsWith('/api') ? rawBase : `${rawBase.replace(/\/$/, '')}/api`;
 
+const AUTH_KEY = 'ersync.auth.v1';
+
 export class ApiService {
   private static currentRole: UserRole = 'ADMIN';
   private static currentHospitalId: string = 'hosp_lagos_central';
+  private static token: string | null = null;
+
+  /** Called when the server rejects our token (expired / invalid) so the app can return to the login screen. */
+  static unauthorizedHandler: (() => void) | null = null;
+
+  // ── Authentication ──
+  static isAuthenticated() { return !!this.token; }
+
+  /** Restores a saved session (localStorage = "keep me signed in", sessionStorage = this tab only). */
+  static loadSession(): { token: string; user: AuthUser } | null {
+    for (const store of [localStorage, sessionStorage]) {
+      try {
+        const raw = store.getItem(AUTH_KEY);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (parsed?.token && parsed?.user) { this.token = parsed.token; return parsed; }
+      } catch { /* unavailable or corrupt */ }
+    }
+    return null;
+  }
+
+  static async login(username: string, password: string, remember = true): Promise<AuthUser> {
+    const res = await fetch(`${API_BASE}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username.trim(), password })
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json())?.detail; } catch { /* not json */ }
+      throw new Error(res.status === 401 ? 'Incorrect username or password.' : (typeof detail === 'string' && detail) || `Sign-in failed (HTTP ${res.status})`);
+    }
+    const data = await res.json();
+    this.token = data.access_token;
+    this.currentRole = data.user.role;
+    if (data.user.hospital_id) this.currentHospitalId = data.user.hospital_id;
+    const payload = JSON.stringify({ token: data.access_token, user: data.user });
+    try {
+      localStorage.removeItem(AUTH_KEY); sessionStorage.removeItem(AUTH_KEY);
+      (remember ? localStorage : sessionStorage).setItem(AUTH_KEY, payload);
+    } catch { /* storage unavailable: session lives in memory only */ }
+    return data.user as AuthUser;
+  }
+
+  static logout() {
+    this.token = null;
+    try { localStorage.removeItem(AUTH_KEY); sessionStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
+  }
+
+  static async me(): Promise<AuthUser> {
+    const res = await fetch(`${API_BASE}/auth/me`, { headers: this.getHeaders() });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to load profile');
+    return res.json();
+  }
 
   static setRole(role: UserRole, hospitalId: string = 'hosp_lagos_central') {
     this.currentRole = role;
@@ -23,6 +80,10 @@ export class ApiService {
   }
 
   static getHeaders(): Record<string, string> {
+    // A real login always wins: the server resolves role + hospital from the JWT.
+    if (this.token) {
+      return { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` };
+    }
     return {
       'Content-Type': 'application/json',
       'X-Demo-Role': this.currentRole,
