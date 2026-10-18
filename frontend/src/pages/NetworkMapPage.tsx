@@ -1,163 +1,143 @@
 import React, { useState } from 'react';
-import type { Hospital, Emergency, OneClickDemoResult } from '../types';
+import clsx from 'clsx';
+import type { Hospital, Emergency, OneClickDemoResult, UserRole } from '../types';
 import { MapComponent } from '../components/MapComponent';
-import { Building2, Search, Filter, RefreshCw, MapPin, Bed, Activity, Clock } from 'lucide-react';
 import { ApiService } from '../services/api';
+import { useConfirm, useToast } from '../ui/UIProvider';
+import { Badge, Button, Card, EmptyState, PageHeader, ProgressBar, Segmented } from '../ui/primitives';
+import { cleanName, hospitalTone, relTime } from '../utils/format';
+import { Activity, Bed, Building2, Clock, FlaskConical, Map as MapIcon, MapPin, RefreshCw, Search } from 'lucide-react';
 
-interface NetworkMapPageProps {
+interface Props {
   hospitals: Hospital[];
   activeEmergency: Emergency | null;
   demoResult: OneClickDemoResult | null;
   onRefresh: () => void;
+  role?: UserRole;
 }
 
-export const NetworkMapPage: React.FC<NetworkMapPageProps> = ({
-  hospitals,
-  activeEmergency,
-  onRefresh
-}) => {
-  const [search, setSearch] = useState('');
-  const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
-  const [statusFilter, setStatusFilter] = useState('ALL');
+type Filter = 'ALL' | 'ACCEPTING' | 'CLOSED' | 'STALE';
 
-  const filteredHospitals = hospitals.filter(h => {
-    const matchesSearch = h.name.toLowerCase().includes(search.toLowerCase()) || 
-                          h.address.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || 
-                          (statusFilter === 'ACCEPTING' && h.accepting_emergencies) ||
-                          (statusFilter === 'CLOSED' && h.emergency_status === 'CLOSED') ||
-                          (statusFilter === 'STALE' && h.is_stale);
+export const NetworkMapPage: React.FC<Props> = ({ hospitals, activeEmergency, onRefresh, role = 'ADMIN' }) => {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Hospital | null>(null);
+  const [filter, setFilter] = useState<Filter>('ALL');
+  const [refreshing, setRefreshing] = useState(false);
+  const [staleBusy, setStaleBusy] = useState<string | null>(null);
+
+  const filtered = hospitals.filter((h) => {
+    const q = search.toLowerCase();
+    const matchesSearch = h.name.toLowerCase().includes(q) || h.address.toLowerCase().includes(q);
+    const matchesStatus =
+      filter === 'ALL' ||
+      (filter === 'ACCEPTING' && h.accepting_emergencies) ||
+      (filter === 'CLOSED' && (h.emergency_status === 'CLOSED' || !h.accepting_emergencies)) ||
+      (filter === 'STALE' && h.is_stale);
     return matchesSearch && matchesStatus;
   });
 
-  const handleMakeStale = async (hospId: string) => {
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try { await onRefresh(); toast.success('Grid refreshed', { duration: 1800 }); } finally { setRefreshing(false); }
+  };
+
+  const handleMakeStale = async (h: Hospital) => {
+    const ok = await confirm({
+      title: 'Simulate stale data?',
+      message: `${cleanName(h.name)} will appear to have stopped reporting for 60 minutes. Critical cases will exclude it until it updates again.`,
+      confirmLabel: 'Simulate stale',
+      tone: 'warn',
+      icon: Clock,
+    });
+    if (!ok) return;
+    setStaleBusy(h.id);
     try {
-      await ApiService.makeHospitalStale(hospId, 60);
+      await ApiService.makeHospitalStale(h.id, 60);
+      toast.warning(`${cleanName(h.name)} is now stale`, { message: 'Matching will penalise or exclude it.' });
       onRefresh();
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e: any) {
+      toast.error('Could not simulate stale data', { message: e?.message });
+    } finally { setStaleBusy(null); }
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">Geospatial Facility Grid</h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Real-time GPS mapping and capacity telemetry for registered Lagos hospitals</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onRefresh}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs rounded-xl shadow-2xs transition cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-            <span>Refresh Grid</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Search & Filter Bar */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
-          <input
-            type="text"
-            placeholder="Search hospitals by name, area, or medical district..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-3 py-2 text-xs text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-300 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 outline-none cursor-pointer w-full sm:w-auto"
-          >
-            <option value="ALL">All Facilities ({hospitals.length})</option>
-            <option value="ACCEPTING">Accepting Admissions</option>
-            <option value="CLOSED">Diverted / Full</option>
-            <option value="STALE">Stale Telemetry (&gt;30m)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Main Map */}
-      <MapComponent
-        hospitals={filteredHospitals}
-        emergency={activeEmergency}
-        selectedHospital={selectedHospital}
-        height="400px"
-        onSelectHospital={setSelectedHospital}
+    <div className="space-y-6">
+      <PageHeader
+        icon={MapIcon}
+        tone="info"
+        eyebrow="Geospatial grid"
+        title="Facility Map"
+        description="Every registered hospital in the Lagos network with live status, free beds and data freshness."
+        actions={<Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={handleRefresh}>Refresh grid</Button>}
       />
 
-      {/* Hospital Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredHospitals.map(h => {
-          const isSelected = selectedHospital?.id === h.id;
-          return (
-            <div
-              key={h.id}
-              onClick={() => setSelectedHospital(h)}
-              className={`p-5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
-                isSelected 
-                  ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-xs' 
-                  : 'bg-white border-slate-200/80 hover:border-slate-300 shadow-xs'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900 leading-tight">
-                      {h.name.replace('SIMULATED HOSPITAL — ', '')}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 font-medium mt-1 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate">{h.address}</span>
-                    </p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
-                    h.emergency_status === 'OPEN' && h.accepting_emergencies 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                    h.emergency_status === 'LIMITED' 
-                      ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                    'bg-rose-50 text-rose-700 border border-rose-200'
-                  }`}>
-                    {h.emergency_status}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-100">
-                  <div className="flex items-center gap-1.5 text-slate-600 font-bold">
-                    <Bed className="w-3.5 h-3.5 text-blue-600" />
-                    <span>{h.available_emergency_beds} / {h.total_emergency_beds} Beds Free</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-600 font-bold">
-                    <Activity className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>{h.overall_capacity}% Utilized</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className={`font-bold ${h.is_stale ? 'text-amber-700' : 'text-slate-400'}`}>
-                  {h.freshness_category === 'FRESH' ? 'Telemetry Active' : 'Stale (>30m)'}
-                </span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleMakeStale(h.id); }}
-                  className="text-[10px] text-purple-700 hover:text-purple-900 font-bold px-2 py-1 bg-purple-50 hover:bg-purple-100 rounded-lg border border-purple-200 transition cursor-pointer"
-                >
-                  Simulate Stale
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="-mx-4 overflow-x-auto px-4 no-scrollbar lg:mx-0 lg:px-0">
+          <Segmented<Filter>
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'ALL', label: `All (${hospitals.length})` },
+              { value: 'ACCEPTING', label: 'Accepting' },
+              { value: 'CLOSED', label: 'Diverted' },
+              { value: 'STALE', label: 'Stale' },
+            ]}
+          />
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-300" />
+          <input className="input !h-10 !pl-10 lg:!w-80" placeholder="Search hospital or area" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
       </div>
+
+      <MapComponent hospitals={filtered} emergency={activeEmergency} selectedHospital={selected} height="min(52vh, 460px)" onSelectHospital={setSelected} />
+
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((h) => {
+            const isSel = selected?.id === h.id;
+            const tone = hospitalTone(h.emergency_status, h.accepting_emergencies);
+            const pct = (h.available_emergency_beds / (h.total_emergency_beds || 1)) * 100;
+            return (
+              <div key={h.id} onClick={() => setSelected(h)} className={clsx('card card-interactive flex cursor-pointer flex-col gap-4 p-5', isSel && '!border-signal-300 ring-4 ring-signal-100')}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className={clsx('mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-xl', tone === 'signal' ? 'bg-signal-50 text-signal-700' : tone === 'warn' ? 'bg-warn-50 text-warn-700' : 'bg-alert-50 text-alert-600')}>
+                      <Building2 className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-[14.5px] font-bold leading-snug text-ink-900">{cleanName(h.name)}</h3>
+                      <p className="mt-0.5 flex items-center gap-1 text-[12px] font-medium text-ink-500"><MapPin className="size-3 shrink-0 text-ink-300" /><span className="truncate">{h.address}</span></p>
+                    </div>
+                  </div>
+                  <Badge tone={tone} dot>{h.emergency_status === 'CLOSED' ? 'Closed' : !h.accepting_emergencies ? 'Diverting' : h.emergency_status === 'LIMITED' ? 'Limited' : 'Open'}</Badge>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-[12.5px] font-semibold">
+                    <span className="inline-flex items-center gap-1.5 text-ink-700"><Bed className="size-4 text-info-600" />{h.available_emergency_beds} / {h.total_emergency_beds} beds free</span>
+                    <span className="inline-flex items-center gap-1.5 text-ink-400"><Activity className="size-3.5" />{h.overall_capacity}% used</span>
+                  </div>
+                  <ProgressBar value={pct} tone={pct < 20 ? 'alert' : pct < 45 ? 'warn' : 'signal'} height={6} />
+                </div>
+
+                <div className="flex items-center justify-between border-t border-ink-100 pt-3.5 text-[12px]">
+                  <span className={clsx('inline-flex items-center gap-1.5 font-semibold', h.is_stale ? 'text-warn-700' : 'text-ink-400')}>
+                    <Clock className="size-3.5" />{h.is_stale ? 'Stale · ' : 'Updated '}{relTime(h.last_status_update)}
+                  </span>
+                  {role === 'ADMIN' && (
+                    <Button variant="ghost" size="sm" icon={FlaskConical} loading={staleBusy === h.id} onClick={(e) => { e.stopPropagation(); handleMakeStale(h); }}>Simulate stale</Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <Card><EmptyState icon={Building2} title="No hospitals match" description="Try a different filter or search term." action={<Button variant="secondary" size="sm" onClick={() => { setFilter('ALL'); setSearch(''); }}>Reset filters</Button>} /></Card>
+      )}
     </div>
   );
 };

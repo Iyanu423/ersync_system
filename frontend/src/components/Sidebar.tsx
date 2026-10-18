@@ -1,163 +1,150 @@
-import React from 'react';
-import { 
-  ShieldAlert, 
-  Activity, 
-  Building2, 
-  MapPin, 
-  BarChart3, 
-  Zap, 
-  Layers, 
-  RotateCcw,
-  X,
-  ChevronRight,
-  Stethoscope,
-  HeartPulse
-} from 'lucide-react';
+import React, { useState } from 'react';
+import clsx from 'clsx';
+import { ArrowLeftRight, ChevronsLeft, ChevronsRight, RotateCcw, Wifi, WifiOff } from 'lucide-react';
+import type { UserRole } from '../types';
+import { navFor, ROLE_META, type TabId } from '../config/workspace';
 
 interface SidebarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  role: UserRole;
+  workspaceName: string;
+  activeTab: TabId;
+  onNavigate: (tab: TabId) => void;
+  onSwitchWorkspace: () => void;
   onResetSimulation: () => void;
-  isOpenMobile?: boolean;
-  onCloseMobile?: () => void;
+  badges: Partial<Record<TabId, number>>;
+  online: boolean;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  activeTab,
-  setActiveTab,
-  onResetSimulation,
-  isOpenMobile = false,
-  onCloseMobile
-}) => {
-  const navItems = [
-    {
-      category: "INTAKE",
-      items: [
-        { id: 'intake', label: 'Submit an Emergency', icon: Activity },
-      ]
-    },
-    {
-      category: "OPERATIONS",
-      items: [
-        { id: 'command', label: 'Command Center', icon: Layers },
-        { id: 'network', label: 'Geospatial Grid', icon: MapPin },
-        { id: 'analytics', label: 'Analytics & KPIs', icon: BarChart3 },
-      ]
-    },
-    {
-      category: "FACILITY",
-      items: [
-        { id: 'hospital', label: 'Hospital Dashboard', icon: Building2 },
-      ]
-    },
-    {
-      category: "SIMULATION",
-      items: [
-        { id: 'demo', label: '1-Click Failover', icon: Zap },
-      ]
-    }
-  ];
+const COLLAPSE_KEY = 'ersync.sidebar.collapsed';
 
-  const handleNavClick = (id: string) => {
-    setActiveTab(id);
-    if (onCloseMobile) onCloseMobile();
+export const BrandMark: React.FC<{ size?: number; className?: string }> = ({ size = 40, className }) => (
+  <span className={clsx('relative inline-flex shrink-0 items-center justify-center rounded-[13px] bg-white shadow-[0_6px_20px_-6px_rgba(38,195,162,.7)] ring-1 ring-white/20', className)} style={{ width: size, height: size }}>
+    <img src="/logo.png" alt="ER-Sync" className="size-[78%] object-contain" />
+  </span>
+);
+
+export const Sidebar: React.FC<SidebarProps> = ({ role, workspaceName, activeTab, onNavigate, onSwitchWorkspace, onResetSimulation, badges, online }) => {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
+  });
+  const toggle = () => {
+    setCollapsed((c) => {
+      try { localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1'); } catch { /* ignore */ }
+      return !c;
+    });
   };
 
+  const meta = ROLE_META[role];
+  const items = navFor(role);
+  const groups = Array.from(new Set(items.map((i) => i.group)));
+
   return (
-    <>
-      {/* Mobile Backdrop */}
-      {isOpenMobile && (
-        <div 
-          onClick={onCloseMobile}
-          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs md:hidden animate-in fade-in"
-        />
+    <aside
+      className={clsx(
+        'side-pattern relative hidden h-dvh shrink-0 select-none flex-col bg-ink-950 text-white transition-[width] duration-300 ease-out lg:flex',
+        collapsed ? 'w-[84px]' : 'w-[284px]',
       )}
-
-      {/* Sidebar Container */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 flex flex-col h-screen shrink-0 select-none transition-transform duration-300 ease-in-out shadow-xl md:shadow-none ${
-        isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      }`}>
-        {/* Brand Header */}
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-          <div 
-            onClick={() => handleNavClick('command')} 
-            className="flex items-center gap-3 cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl overflow-hidden border border-blue-200 shadow-sm shadow-blue-600/15 group-hover:scale-105 transition-transform bg-white flex items-center justify-center p-0.5 shrink-0">
-              <img src="/logo.png" alt="ER-Sync Logo" className="w-full h-full object-contain rounded-lg" />
+    >
+      {/* Brand */}
+      <div className={clsx('flex items-center gap-3 px-5 pb-4 pt-6', collapsed && 'justify-center px-0')}>
+        <BrandMark size={42} />
+        {!collapsed && (
+          <div className="min-w-0 leading-tight">
+            <div className="flex items-center gap-2">
+              <span className="text-[19px] font-extrabold tracking-tight">ER-Sync</span>
+              <span className="rounded-md bg-signal-400/15 px-1.5 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider text-signal-300">Live</span>
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-sm text-[#163b82] tracking-tight">ER-Sync.</span>
-                <span className="px-1.5 py-0.2 text-[9px] font-black bg-blue-100 text-[#163b82] border border-blue-200 rounded-md">
-                  EOC
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-bold truncate">Hospital Emergency System</p>
+            <p className="truncate text-[11.5px] font-medium text-ink-300/80">Emergency Coordination Network</p>
+          </div>
+        )}
+      </div>
+
+      {/* Workspace card */}
+      <div className={clsx('px-4 pb-2', collapsed && 'px-3')}>
+        <button
+          onClick={onSwitchWorkspace}
+          title="Switch workspace"
+          className={clsx(
+            'group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 text-left transition hover:border-white/20 hover:bg-white/[0.09]',
+            collapsed && 'justify-center p-2.5',
+          )}
+        >
+          <span className={clsx('inline-flex size-9 shrink-0 items-center justify-center rounded-xl',
+            meta.tone === 'signal' ? 'bg-signal-400/20 text-signal-300' : meta.tone === 'alert' ? 'bg-alert-400/20 text-alert-300' : 'bg-info-500/25 text-info-200')}>
+            <meta.icon className="size-[18px]" strokeWidth={2.1} />
+          </span>
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-bold uppercase tracking-[.1em] text-ink-300/70">Workspace</span>
+                <span className="block truncate text-[13.5px] font-bold">{role === 'HOSPITAL_STAFF' ? workspaceName : meta.label}</span>
+                <span className="block truncate text-[11.5px] font-medium text-ink-300/70">{role === 'HOSPITAL_STAFF' ? meta.label : meta.tagline}</span>
+              </span>
+              <ArrowLeftRight className="size-4 shrink-0 text-ink-300/60 transition group-hover:text-white" />
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-4 pb-4 pt-3" aria-label="Primary">
+        {groups.map((g) => (
+          <div key={g} className="mb-5">
+            {!collapsed ? (
+              <p className="mb-1.5 px-3 text-[10.5px] font-bold uppercase tracking-[.12em] text-ink-400/80">{g}</p>
+            ) : (
+              <div className="mx-auto mb-2 h-px w-6 bg-white/10" />
+            )}
+            <div className="space-y-1">
+              {items.filter((i) => i.group === g).map((item) => {
+                const count = badges[item.id] || 0;
+                return (
+                  <button
+                    key={item.id}
+                    data-active={activeTab === item.id}
+                    onClick={() => onNavigate(item.id)}
+                    title={collapsed ? item.label : undefined}
+                    className={clsx('side-link', collapsed && 'justify-center px-0')}
+                  >
+                    <item.icon className="side-ico size-[19px]" strokeWidth={2} />
+                    {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                    {!collapsed && count > 0 && (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-alert-500 px-1.5 text-[11px] font-extrabold text-white tabnum">{count > 99 ? '99+' : count}</span>
+                    )}
+                    {collapsed && count > 0 && <span className="absolute right-2 top-2 size-2.5 rounded-full bg-alert-500 ring-2 ring-ink-950" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
+        ))}
+      </nav>
 
-          {/* Close button on mobile */}
-          <button
-            onClick={onCloseMobile}
-            className="md:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-          >
-            <X className="w-5 h-5 stroke-[2.5]" />
-          </button>
-        </div>
-
-        {/* Navigation Categories */}
-        <div className="flex-1 overflow-y-auto px-3.5 py-5 space-y-6">
-          {navItems.map((group, gIdx) => (
-            <div key={gIdx} className="space-y-1">
-              <div className="px-3 text-[11px] font-black tracking-wider text-slate-400 uppercase mb-2">
-                {group.category}
-              </div>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isActive = activeTab === item.id;
-                  const Icon = item.icon;
-
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleNavClick(item.id)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all text-left group cursor-pointer ${
-                        isActive
-                          ? 'bg-blue-600 text-white font-black shadow-xs'
-                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 font-bold'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Icon className={`w-4 h-4 stroke-[2.5] ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'}`} />
-                        <span className="tracking-tight">{item.label}</span>
-                      </div>
-                      
-                      {isActive && (
-                        <ChevronRight className="w-4 h-4 text-blue-200 stroke-[3]" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+      {/* Footer */}
+      <div className="space-y-2.5 border-t border-white/10 p-4">
+        <div className={clsx('flex items-center gap-2.5 rounded-xl bg-white/[0.04] px-3 py-2.5', collapsed && 'justify-center px-0')}>
+          {online ? <Wifi className="size-4 shrink-0 text-signal-300" /> : <WifiOff className="size-4 shrink-0 text-alert-300" />}
+          {!collapsed && (
+            <div className="min-w-0 leading-tight">
+              <p className="text-[12px] font-bold">{online ? 'All systems live' : 'Backend unreachable'}</p>
+              <p className="text-[10.5px] font-medium text-ink-300/70">{online ? 'Deterministic engine online' : 'Retrying every 10s'}</p>
             </div>
-          ))}
+          )}
+          {!collapsed && <span className="relative ml-auto flex size-2"><span className={clsx('ping-soft absolute inline-flex size-full rounded-full', online ? 'bg-signal-400' : 'bg-alert-400')} /><span className={clsx('relative inline-flex size-2 rounded-full', online ? 'bg-signal-400' : 'bg-alert-400')} /></span>}
         </div>
 
-        {/* System Reset & Status Footer */}
-        <div className="p-4 border-t border-slate-200 space-y-2">
-          <button
-            onClick={onResetSimulation}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black transition cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Reset Demo State</span>
+        <div className={clsx('flex gap-2', collapsed && 'flex-col')}>
+          {role === 'ADMIN' && (
+            <button onClick={onResetSimulation} title="Reset demo data" className={clsx('flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-white/[0.06] text-[12px] font-bold text-ink-200 transition hover:bg-white/[0.12] hover:text-white')}>
+              <RotateCcw className="size-3.5" />
+              {!collapsed && 'Reset demo'}
+            </button>
+          )}
+          <button onClick={toggle} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} className="flex size-9 items-center justify-center rounded-xl bg-white/[0.06] text-ink-300 transition hover:bg-white/[0.12] hover:text-white">
+            {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
           </button>
-          <div className="text-[10px] text-center text-slate-400 font-semibold">
-            Deterministic Engine &bull; Sub-second Triage
-          </div>
         </div>
-      </aside>
-    </>
+      </div>
+    </aside>
   );
 };

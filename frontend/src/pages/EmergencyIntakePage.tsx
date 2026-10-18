@@ -1,281 +1,236 @@
 import React, { useState } from 'react';
+import clsx from 'clsx';
 import { ApiService } from '../services/api';
 import type { Emergency } from '../types';
-import { 
-  Send, 
-  MapPin, 
-  Activity, 
-  Car, 
-  HeartPulse, 
-  Flame, 
-  AlertCircle,
-  Phone,
-  User,
-  Clock,
-  ShieldCheck,
-  CheckCircle2
-} from 'lucide-react';
+import { useToast } from '../ui/UIProvider';
+import { Alert, Badge, Button, Card, CardHeader, Field, IconTile, KV, Modal, PageHeader } from '../ui/primitives';
+import { severityTone, titleCase } from '../utils/format';
+import { Activity, Bed, Building2, Car, CheckCircle2, Flame, HeartPulse, MapPin, Phone, Radar, Send, ShieldCheck, Siren, Stethoscope, Users, Zap, TriangleAlert } from 'lucide-react';
 
-interface EmergencyIntakePageProps {
+interface Props {
   onEmergencyCreated: (emergency: Emergency) => void;
   onNavigateToCommand: () => void;
-  onNavigateToPatient: () => void;
 }
 
 const LAGOS_LANDMARKS = [
-  { name: "Lekki-Epe Expressway / Admiralty Way", lat: 6.4474, lng: 3.4731 },
-  { name: "Ozumba Mbadiwe Way, Victoria Island", lat: 6.4281, lng: 3.4219 },
-  { name: "Third Mainland Bridge (Adeniji Axis)", lat: 6.4712, lng: 3.3982 },
-  { name: "Ikeja Along / Airport Road", lat: 6.5954, lng: 3.3515 },
-  { name: "Herbert Macaulay Way, Yaba", lat: 6.5158, lng: 3.3718 },
-  { name: "Ojuelegba Underbridge, Surulere", lat: 6.4969, lng: 3.3533 },
+  { name: 'Lekki-Epe Expressway / Admiralty Way', lat: 6.4474, lng: 3.4731 },
+  { name: 'Ozumba Mbadiwe Way, Victoria Island', lat: 6.4281, lng: 3.4219 },
+  { name: 'Third Mainland Bridge (Adeniji Axis)', lat: 6.4712, lng: 3.3982 },
+  { name: 'Ikeja Along / Airport Road', lat: 6.5954, lng: 3.3515 },
+  { name: 'Herbert Macaulay Way, Yaba', lat: 6.5158, lng: 3.3718 },
+  { name: 'Ojuelegba Underbridge, Surulere', lat: 6.4969, lng: 3.3533 },
 ];
 
 const PRESETS = [
-  {
-    title: "Motorcycle Trauma",
-    category: "Road accident",
-    description: "Motorcycle accident. Unconscious patient with severe head trauma, altered mental status, and active scalp hemorrhage.",
-    locationIndex: 0,
-    patientCount: 1,
-    icon: Car,
-    tag: "Critical",
-    symptoms: "Unconscious, scalp laceration, suspected skull fracture"
-  },
-  {
-    title: "Acute Chest Pain / STEMI",
-    category: "Chest pain",
-    description: "55yo male with crushing retrosternal pain radiating to left arm, diaphoresis, dyspnea, and cardiac distress.",
-    locationIndex: 1,
-    patientCount: 1,
-    icon: HeartPulse,
-    tag: "Cardiology",
-    symptoms: "Crushing chest pain, shortness of breath, cold sweat"
-  },
-  {
-    title: "Highway Multi-Crash",
-    category: "Road accident",
-    description: "Multi-vehicle pileup with multiple trapped casualties requiring trauma resuscitation and emergency surgery.",
-    locationIndex: 2,
-    patientCount: 3,
-    icon: Flame,
-    tag: "Mass Casualty",
-    symptoms: "Multiple blunt trauma, arterial bleed, pelvic fractures"
-  }
+  { title: 'Motorcycle trauma', category: 'Road accident', description: 'Motorcycle accident. Unconscious patient with severe head trauma, altered mental status, and active scalp hemorrhage.', locationIndex: 0, patientCount: 1, icon: Car, tag: 'Critical', symptoms: 'Unconscious, scalp laceration, suspected skull fracture' },
+  { title: 'Acute chest pain / STEMI', category: 'Chest pain', description: '55yo male with crushing retrosternal pain radiating to left arm, diaphoresis, dyspnea, and cardiac distress.', locationIndex: 1, patientCount: 1, icon: HeartPulse, tag: 'Cardiology', symptoms: 'Crushing chest pain, shortness of breath, cold sweat' },
+  { title: 'Highway multi-crash', category: 'Road accident', description: 'Multi-vehicle pileup with multiple trapped casualties requiring trauma resuscitation and emergency surgery.', locationIndex: 2, patientCount: 3, icon: Flame, tag: 'Mass casualty', symptoms: 'Multiple blunt trauma, arterial bleed, pelvic fractures' },
 ];
 
-export const EmergencyIntakePage: React.FC<EmergencyIntakePageProps> = ({
-  onEmergencyCreated
-}) => {
-  const [category, setCategory] = useState("Road accident");
+const CATEGORIES = ['Road accident', 'Severe bleeding', 'Head injury', 'Chest pain', 'Stroke symptoms', 'Burns', 'Fracture', 'Unconscious patient', 'Pregnancy emergency', 'Other'];
+
+export const EmergencyIntakePage: React.FC<Props> = ({ onEmergencyCreated, onNavigateToCommand }) => {
+  const toast = useToast();
+  const [category, setCategory] = useState(PRESETS[0].category);
   const [description, setDescription] = useState(PRESETS[0].description);
   const [selectedLandmark, setSelectedLandmark] = useState(0);
   const [patientCount, setPatientCount] = useState(1);
-  const [callerPhone, setCallerPhone] = useState("+234 802 345 6789");
+  const [callerPhone, setCallerPhone] = useState('+234 802 345 6789');
   const [symptoms, setSymptoms] = useState(PRESETS[0].symptoms);
+  const [activePreset, setActivePreset] = useState<number | null>(0);
+  const [errors, setErrors] = useState<{ description?: string; phone?: string; count?: string }>({});
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<Emergency | null>(null);
 
-  const categories = [
-    "Road accident",
-    "Severe bleeding",
-    "Head injury",
-    "Chest pain",
-    "Stroke symptoms",
-    "Burns",
-    "Fracture",
-    "Unconscious patient",
-    "Pregnancy emergency",
-    "Other"
-  ];
-
-  const applyPreset = (p: typeof PRESETS[0]) => {
-    setCategory(p.category);
-    setDescription(p.description);
-    setSelectedLandmark(p.locationIndex);
-    setPatientCount(p.patientCount);
-    setSymptoms(p.symptoms);
+  const applyPreset = (p: typeof PRESETS[0], idx: number) => {
+    setCategory(p.category); setDescription(p.description); setSelectedLandmark(p.locationIndex);
+    setPatientCount(p.patientCount); setSymptoms(p.symptoms); setActivePreset(idx); setErrors({});
+    toast.info(`Loaded “${p.title}”`, { message: 'Review the details, then submit.', duration: 2200 });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const markEdited = () => setActivePreset(null);
+
+  const validate = () => {
+    const next: typeof errors = {};
+    if (description.trim().length < 10) next.description = 'Describe the incident in at least a few words so triage can classify it.';
+    if (callerPhone.trim() && !/^[+\d][\d\s()-]{6,}$/.test(callerPhone.trim())) next.phone = 'Enter a valid phone number, e.g. +234 802 345 6789.';
+    if (!Number.isFinite(patientCount) || patientCount < 1 || patientCount > 50) next.count = 'Enter between 1 and 50 casualties.';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const openReview = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim()) {
-      setError("Please describe the incident clinical assessment.");
+    if (!validate()) {
+      toast.warning('Please fix the highlighted fields');
       return;
     }
+    setReviewOpen(true);
+  };
 
+  const submit = async () => {
     setIsSubmitting(true);
-    setError(null);
-
     try {
       const loc = LAGOS_LANDMARKS[selectedLandmark];
-      const newEmergency = await ApiService.createEmergency({
-        latitude: loc.lat,
-        longitude: loc.lng,
-        location_name: loc.name,
-        description,
-        category,
-        patient_count: Number(patientCount),
-        caller_phone: callerPhone,
-        symptoms: symptoms.trim()
+      const em = await ApiService.createEmergency({
+        latitude: loc.lat, longitude: loc.lng, location_name: loc.name, description: description.trim(), category,
+        patient_count: Number(patientCount), caller_phone: callerPhone.trim(), symptoms: symptoms.trim(),
       });
-
-      onEmergencyCreated(newEmergency);
+      setReviewOpen(false);
+      setCreated(em);
+      onEmergencyCreated(em);
+      toast.success('Emergency dispatched', { message: `${em.incident_reference} is being matched to a hospital.` });
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to submit emergency.");
+      toast.error('Could not submit the emergency', { message: err?.message || 'Please check your connection and try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const reset = () => {
+    setCreated(null); setErrors({}); setActivePreset(null);
+    setCategory(CATEGORIES[0]); setDescription(''); setSymptoms(''); setPatientCount(1); setSelectedLandmark(0);
+  };
+
+  const loc = LAGOS_LANDMARKS[selectedLandmark];
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">Emergency Intake &amp; Triage</h1>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Submit incident report for automated clinical evaluation and nearest optimal hospital dispatch</p>
-        </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        icon={Siren}
+        tone="alert"
+        eyebrow="Intake & triage"
+        title="Report an emergency"
+        description="Tell us what happened. ER-Sync classifies severity, finds hospitals that can actually treat the patient, and reserves a bed — in seconds."
+      />
+
+      {/* How it works */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          { icon: Stethoscope, t: '1 · AI triage', d: 'Severity and clinical needs are extracted from your description.' },
+          { icon: ShieldCheck, t: '2 · Safety filters', d: 'Hospitals without a bed, specialist or equipment are excluded.' },
+          { icon: Building2, t: '3 · Bed reserved', d: 'The best hospital is asked to accept. If not, we fail over instantly.' },
+        ].map((s) => (
+          <div key={s.t} className="flex items-start gap-3 rounded-2xl border border-ink-100 bg-white p-4">
+            <IconTile icon={s.icon} tone="signal" size="sm" />
+            <div><p className="text-[13px] font-bold text-ink-900">{s.t}</p><p className="mt-0.5 text-[12px] font-medium leading-relaxed text-ink-500">{s.d}</p></div>
+          </div>
+        ))}
       </div>
 
-      {/* Quick Presets Grid */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Demo Presets</span>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Presets */}
+      <div>
+        <p className="eyebrow mb-2.5">Quick scenarios</p>
+        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 no-scrollbar sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
           {PRESETS.map((p, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => applyPreset(p)}
-              className="p-4 bg-white hover:bg-blue-50/40 border border-slate-200/80 hover:border-blue-300 rounded-2xl text-left transition shadow-xs group cursor-pointer space-y-2"
-            >
+            <button key={p.title} type="button" onClick={() => applyPreset(p, idx)}
+              className={clsx('card min-w-[250px] shrink-0 space-y-2.5 p-4 text-left transition active:scale-[.98] sm:min-w-0', activePreset === idx ? 'border-signal-300 ring-4 ring-signal-100' : 'card-interactive')}>
               <div className="flex items-center justify-between">
-                <div className="p-2 bg-slate-50 group-hover:bg-blue-100 rounded-xl text-slate-700 group-hover:text-blue-700 transition">
-                  <p.icon className="w-4 h-4 stroke-[2.5]" />
-                </div>
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                  {p.tag}
-                </span>
+                <IconTile icon={p.icon} tone={activePreset === idx ? 'signal' : 'neutral'} size="sm" />
+                <Badge tone={activePreset === idx ? 'signal' : 'neutral'} small>{p.tag}</Badge>
               </div>
               <div>
-                <h3 className="text-xs font-black text-slate-900 group-hover:text-blue-700">{p.title}</h3>
-                <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">{p.description}</p>
+                <h3 className="text-[14px] font-bold text-ink-900">{p.title}</h3>
+                <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-relaxed text-ink-500">{p.description}</p>
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      {error && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Main Intake Form */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Row 1: Category, Casualties, Location */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-black text-slate-700 mb-1.5 uppercase tracking-wide">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+      {/* Form */}
+      <Card>
+        <CardHeader icon={Activity} tone="alert" title="Incident details" subtitle="The more specific, the better the match" />
+        <form onSubmit={openReview} className="space-y-5" noValidate>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="Category">
+              <select className="input" value={category} onChange={(e) => { setCategory(e.target.value); markEdited(); }}>
+                {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-slate-700 mb-1.5 uppercase tracking-wide">Casualties</label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={patientCount}
-                onChange={(e) => setPatientCount(Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-slate-700 mb-1.5 uppercase tracking-wide">Lagos Landmark</label>
-              <select
-                value={selectedLandmark}
-                onChange={(e) => setSelectedLandmark(Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none truncate cursor-pointer"
-              >
-                {LAGOS_LANDMARKS.map((lm, idx) => (
-                  <option key={idx} value={idx}>{lm.name}</option>
-                ))}
+            </Field>
+            <Field label="Casualties" error={errors.count}>
+              <input type="number" inputMode="numeric" min={1} max={50} className={clsx('input', errors.count && 'input-error')} value={patientCount} onChange={(e) => { setPatientCount(Number(e.target.value)); markEdited(); }} />
+            </Field>
+            <Field label="Location (Lagos)">
+              <select className="input" value={selectedLandmark} onChange={(e) => { setSelectedLandmark(Number(e.target.value)); markEdited(); }}>
+                {LAGOS_LANDMARKS.map((l, i) => <option key={l.name} value={i}>{l.name}</option>)}
               </select>
-            </div>
+            </Field>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-black text-slate-700 mb-1.5 uppercase tracking-wide">Incident Assessment &amp; Clinical Notes</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe injuries, patient consciousness, trauma severity, and required resources..."
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 outline-none leading-relaxed"
-            />
+          <Field label="What happened?" error={errors.description} hint="Include consciousness, bleeding, breathing, and any resources needed.">
+            <textarea rows={4} className={clsx('input', errors.description && 'input-error')} value={description}
+              onChange={(e) => { setDescription(e.target.value); markEdited(); if (errors.description) setErrors((x) => ({ ...x, description: undefined })); }}
+              placeholder="e.g. Motorcycle collision, rider unconscious with heavy bleeding from the head…" />
+          </Field>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="Symptoms" className="sm:col-span-2" hint="Comma separated">
+              <input className="input" value={symptoms} onChange={(e) => { setSymptoms(e.target.value); markEdited(); }} placeholder="Unconscious, bleeding, difficulty breathing" />
+            </Field>
+            <Field label="Responder phone" error={errors.phone}>
+              <input type="tel" inputMode="tel" className={clsx('input', errors.phone && 'input-error')} value={callerPhone} onChange={(e) => { setCallerPhone(e.target.value); if (errors.phone) setErrors((x) => ({ ...x, phone: undefined })); }} />
+            </Field>
           </div>
 
-          {/* Symptoms & Contact */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-black text-slate-700 mb-1.5 uppercase tracking-wide">Identified Symptoms</label>
-              <input
-                type="text"
-                value={symptoms}
-                onChange={(e) => setSymptoms(e.target.value)}
-                placeholder="Comma separated symptoms"
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-black text-slate-700 mb-1.5 uppercase tracking-wide">Responder Phone</label>
-              <input
-                type="text"
-                value={callerPhone}
-                onChange={(e) => setCallerPhone(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs text-slate-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Action Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md shadow-rose-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>
-                  <Activity className="w-4 h-4 animate-spin" />
-                  <span>Evaluating Clinical Triage &amp; Finding Hospital...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>Submit Incident &amp; Match Hospital</span>
-                </>
-              )}
-            </button>
+          <div className="flex flex-col gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-center gap-2 text-[12.5px] font-medium text-ink-400"><TriangleAlert className="size-4" />For a real emergency, also call your local emergency line.</p>
+            <Button type="submit" variant="danger" size="lg" icon={Send} className="w-full sm:w-auto">Review & dispatch</Button>
           </div>
         </form>
-      </div>
+      </Card>
+
+      {/* Review modal */}
+      <Modal open={reviewOpen} onClose={() => !isSubmitting && setReviewOpen(false)} dismissible={!isSubmitting} size="md" icon={Siren} tone="alert" title="Dispatch this emergency?" subtitle="Check the details before ER-Sync contacts hospitals."
+        footer={<>
+          <Button variant="secondary" onClick={() => setReviewOpen(false)} disabled={isSubmitting}>Edit details</Button>
+          <Button variant="danger" icon={Send} loading={isSubmitting} onClick={submit}>{isSubmitting ? 'Matching hospital…' : 'Dispatch now'}</Button>
+        </>}>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-ink-100 bg-ink-25 p-4">
+            <p className="text-[15px] font-bold text-ink-900">{category} · {patientCount} patient{patientCount === 1 ? '' : 's'}</p>
+            <p className="mt-1 text-[13px] font-medium leading-relaxed text-ink-600">{description}</p>
+          </div>
+          <div className="divide-y divide-ink-100">
+            <KV label="Location"><span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5 text-ink-400" />{loc.name}</span></KV>
+            {symptoms.trim() && <KV label="Symptoms">{symptoms}</KV>}
+            {callerPhone.trim() && <KV label="Responder"><span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-ink-400" />{callerPhone}</span></KV>}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Success modal */}
+      <Modal open={!!created} onClose={reset} size="md" icon={CheckCircle2} tone="signal" title="Emergency dispatched" subtitle={created ? `Incident ${created.incident_reference}` : undefined}
+        footer={<>
+          <Button variant="secondary" onClick={reset}>Report another</Button>
+          <Button variant="primary" icon={Radar} onClick={() => { reset(); onNavigateToCommand(); }}>Track in Command Center</Button>
+        </>}>
+        {created && (
+          <div className="space-y-4">
+            <Alert tone="signal" icon={Zap} title="Matching in progress">ER-Sync is ranking hospitals and requesting a bed. You can follow every step live in the Command Center.</Alert>
+            <div className="flex flex-wrap gap-2">
+              <Badge tone={severityTone(created.severity)} dot pulse={created.severity === 'CRITICAL'}>{titleCase(created.severity)} severity</Badge>
+              <Badge tone="neutral"><Users className="size-3" />{created.patient_count} patient(s)</Badge>
+              <Badge tone="info">{titleCase(created.status)}</Badge>
+            </div>
+            {created.requirements?.length > 0 && (
+              <div>
+                <p className="eyebrow mb-2">Triage identified</p>
+                <div className="flex flex-wrap gap-2">
+                  {created.requirements.map((r, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-ink-100 bg-ink-25 px-2 py-1 text-[12px] font-semibold text-ink-700">
+                      {r.requirement_type === 'SPECIALTY' ? <Stethoscope className="size-3.5 text-info-600" /> : r.requirement_type === 'FACILITY' ? <Building2 className="size-3.5 text-plum-600" /> : <Bed className="size-3.5 text-signal-600" />}
+                      {r.requirement_name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

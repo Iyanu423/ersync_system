@@ -1,21 +1,12 @@
 import React from 'react';
+import clsx from 'clsx';
 import type { OneClickDemoResult } from '../types';
-import { 
-  Zap, 
-  CheckCircle2, 
-  XCircle, 
-  ShieldAlert, 
-  ArrowRight, 
-  Building2, 
-  Clock, 
-  Award, 
-  RefreshCw,
-  ChevronRight,
-  Brain,
-  ShieldCheck
-} from 'lucide-react';
+import { Badge, Button, Card, CardHeader, IconTile, PageHeader } from '../ui/primitives';
+import { cleanName } from '../utils/format';
+import { clockTime } from '../utils/time';
+import { Award, ArrowRight, Brain, Building2, CheckCircle2, ChevronRight, FlaskConical, ScrollText, ShieldAlert, Sliders, XCircle, Zap } from 'lucide-react';
 
-interface DemoPageProps {
+interface Props {
   isDemoRunning: boolean;
   demoResult: OneClickDemoResult | null;
   onRunDemo: () => void;
@@ -23,145 +14,89 @@ interface DemoPageProps {
   onViewCommand: () => void;
 }
 
-export const DemoPage: React.FC<DemoPageProps> = ({
-  isDemoRunning,
-  demoResult,
-  onRunDemo,
-  onViewExplanations,
-  onViewCommand
-}) => {
-  const STEPS = [
-    { num: 1, title: "Incident Intake", icon: ShieldAlert, color: "text-rose-600 bg-rose-50 border-rose-200" },
-    { num: 2, title: "Clinical Triage", icon: Brain, color: "text-blue-600 bg-blue-50 border-blue-200" },
-    { num: 3, title: "Hard Safety Gate", icon: Award, color: "text-indigo-600 bg-indigo-50 border-indigo-200" },
-    { num: 4, title: "Facility #1 Ping", icon: Building2, color: "text-purple-600 bg-purple-50 border-purple-200" },
-    { num: 5, title: "Surge Reject", icon: XCircle, color: "text-amber-600 bg-amber-50 border-amber-200" },
-    { num: 6, title: "Auto Failover", icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-    { num: 7, title: "Bed Reserved", icon: ArrowRight, color: "text-teal-600 bg-teal-50 border-teal-200" },
-  ];
+const STEPS = [
+  { title: 'Incident intake', icon: ShieldAlert, tone: 'alert' as const },
+  { title: 'Clinical triage', icon: Brain, tone: 'info' as const },
+  { title: 'Hard safety gate', icon: Award, tone: 'plum' as const },
+  { title: 'Hospital #1 pinged', icon: Building2, tone: 'neutral' as const },
+  { title: 'Surge reject', icon: XCircle, tone: 'warn' as const },
+  { title: 'Auto failover', icon: CheckCircle2, tone: 'signal' as const },
+  { title: 'Bed reserved', icon: ArrowRight, tone: 'signal' as const },
+];
 
-  return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Action Banner */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-black border border-amber-200">
-              End-to-End Stress Test
-            </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Automated Failover Simulation
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 max-w-2xl leading-relaxed">
-            Simulate critical trauma intake, immediate rejection from primary hospital due to sudden bed surge, and deterministic sub-second failover with guaranteed bed reservation at secondary hospital.
+export const DemoPage: React.FC<Props> = ({ isDemoRunning, demoResult, onRunDemo, onViewExplanations, onViewCommand }) => (
+  <div className="space-y-6">
+    <PageHeader icon={FlaskConical} tone="warn" eyebrow="Simulation" title="Failover Lab"
+      description="Stress-test the network end to end: a critical trauma arrives, the first hospital refuses, and ER-Sync re-routes to a second one with a bed guaranteed." />
+
+    <Card className="!p-0 overflow-hidden">
+      <div className="relative flex flex-col gap-6 bg-gradient-to-br from-ink-950 to-ink-800 p-6 text-white sm:flex-row sm:items-center sm:justify-between sm:p-8">
+        <div className="pointer-events-none absolute -right-10 -top-16 size-64 rounded-full bg-signal-400/20 blur-3xl" />
+        <div className="relative max-w-2xl">
+          <Badge tone="warn" className="mb-3">End-to-end scenario</Badge>
+          <h2 className="text-[24px] font-extrabold leading-tight sm:text-[28px]">Motorcycle collision · Lekki</h2>
+          <p className="mt-2 text-[13.5px] font-medium leading-relaxed text-ink-200/90">
+            Creates a real critical case in the system, simulates a bed-surge rejection at the top-ranked hospital, and shows the automatic failover — no manual steps.
           </p>
         </div>
-
-        <button
-          onClick={onRunDemo}
-          disabled={isDemoRunning}
-          className="flex items-center gap-2 px-6 py-3.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 transition disabled:opacity-50 shrink-0 cursor-pointer"
-        >
-          {isDemoRunning ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Simulating Triage...</span>
-            </>
-          ) : (
-            <>
-              <Zap className="w-4 h-4 fill-white" />
-              <span>RUN FAILOVER SCENARIO</span>
-            </>
-          )}
-        </button>
+        <Button variant="primary" size="lg" icon={Zap} loading={isDemoRunning} onClick={onRunDemo} className="relative w-full shrink-0 sm:w-auto">
+          {isDemoRunning ? 'Simulating…' : demoResult ? 'Run again' : 'Run failover scenario'}
+        </Button>
       </div>
+    </Card>
 
-      {/* 7-Step Progression Horizontal Chips */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Algorithmic Lifecycle</span>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-          {STEPS.map((step) => (
-            <div 
-              key={step.num}
-              className={`p-3.5 rounded-xl border flex flex-col items-center text-center space-y-2 transition-all ${
-                demoResult 
-                  ? 'bg-white border-slate-300 shadow-2xs' 
-                  : 'bg-slate-50 border-slate-200/80'
-              }`}
-            >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${step.color}`}>
-                <step.icon className="w-4 h-4 stroke-[2.5]" />
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400">Step 0{step.num}</div>
-                <span className="text-xs font-black text-slate-900 leading-tight block mt-0.5">
-                  {step.title}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Live Result Cards */}
-      {demoResult && (
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-5 animate-in fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-                <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-slate-900">{demoResult.scenario_name}</h3>
-                <span className="text-xs text-slate-500 font-mono font-bold">Incident Ref: {demoResult.incident_reference}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onViewExplanations(demoResult.emergency_id)}
-                className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer"
-              >
-                Explainability Audit
-              </button>
-              <button
-                onClick={onViewCommand}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-              >
-                <span>Command Center</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+    <div>
+      <p className="eyebrow mb-3">Algorithmic lifecycle</p>
+      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 no-scrollbar sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 xl:grid-cols-7">
+        {STEPS.map((s, i) => (
+          <div key={s.title} className={clsx('card flex min-w-[124px] shrink-0 flex-col items-center gap-2.5 p-4 text-center transition-all duration-500 sm:min-w-0', demoResult ? 'border-signal-200' : isDemoRunning ? 'animate-pulse' : 'opacity-80')}
+            style={{ transitionDelay: `${i * 60}ms` }}>
+            <IconTile icon={s.icon} tone={s.tone} />
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-ink-300">Step {String(i + 1).padStart(2, '0')}</p>
+              <p className="mt-0.5 text-[12.5px] font-bold leading-tight text-ink-900">{s.title}</p>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reported Incident</span>
-              <div className="text-sm font-black text-slate-900">Motorcycle Collision</div>
-              <div className="text-xs text-rose-700 font-bold">Severity: Critical</div>
-            </div>
-
-            <div className="p-4 bg-rose-50/60 rounded-xl border border-rose-200 space-y-1">
-              <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Hospital #1 (Diverted)</span>
-              <div className="text-xs font-black text-slate-900 truncate">{demoResult.first_hospital_attempted.name.replace('SIMULATED HOSPITAL — ', '')}</div>
-              <div className="text-xs text-rose-700 font-bold">Rejected (Bed Surge Divert)</div>
-            </div>
-
-            <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 space-y-1">
-              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Failover Speed</span>
-              <div className="text-lg font-black text-amber-900">&lt; 500 ms</div>
-              <div className="text-xs text-amber-800 font-bold">Zero manual intervention</div>
-            </div>
-
-            <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-200 space-y-1">
-              <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Final Destination</span>
-              <div className="text-xs font-black text-slate-900 truncate">{demoResult.second_hospital_attempted.name.replace('SIMULATED HOSPITAL — ', '')}</div>
-              <div className="text-xs text-emerald-700 font-bold">Confirmed Bed &bull; ETA {demoResult.eta_minutes}m</div>
-            </div>
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
-  );
-};
+
+    {demoResult && (
+      <div className="animate-rise space-y-6">
+        <Card>
+          <CardHeader icon={CheckCircle2} tone="signal" title={demoResult.scenario_name} subtitle={`Incident ${demoResult.incident_reference} · ${demoResult.severity}`}
+            right={<>
+              <Button variant="secondary" size="sm" icon={Sliders} onClick={() => onViewExplanations(demoResult.emergency_id)} className="hidden sm:inline-flex">Decision audit</Button>
+              <Button variant="primary" size="sm" onClick={onViewCommand}>Command Center <ChevronRight className="size-4" /></Button>
+            </>} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-ink-100 bg-ink-25 p-4"><p className="eyebrow">Incident</p><p className="mt-1.5 text-[15px] font-bold text-ink-900">Motorcycle collision</p><p className="text-[12.5px] font-semibold text-alert-600">Severity: {demoResult.severity}</p></div>
+            <div className="rounded-2xl border border-alert-100 bg-alert-50/60 p-4"><p className="eyebrow !text-alert-700">Hospital #1 · declined</p><p className="mt-1.5 truncate text-[15px] font-bold text-ink-900">{cleanName(demoResult.first_hospital_attempted.name)}</p><p className="text-[12.5px] font-semibold text-alert-700">{demoResult.first_rejection_reason || 'Bed surge'}</p></div>
+            <div className="rounded-2xl border border-warn-100 bg-warn-50/60 p-4"><p className="eyebrow !text-warn-700">Failover</p><p className="mt-1.5 text-[15px] font-bold text-ink-900">Automatic</p><p className="text-[12.5px] font-semibold text-warn-700">Zero manual intervention</p></div>
+            <div className="rounded-2xl border border-signal-100 bg-signal-50/70 p-4"><p className="eyebrow !text-signal-700">Final destination</p><p className="mt-1.5 truncate text-[15px] font-bold text-ink-900">{cleanName(demoResult.second_hospital_attempted.name)}</p><p className="text-[12.5px] font-semibold text-signal-700">{demoResult.bed_reserved ? 'Bed reserved' : 'Pending'} · ETA {demoResult.eta_minutes} min · {demoResult.distance_km} km</p></div>
+          </div>
+        </Card>
+
+        {demoResult.timeline?.length > 0 && (
+          <Card>
+            <CardHeader icon={ScrollText} tone="plum" title="Scenario timeline" subtitle="What happened, step by step" />
+            <ol className="relative space-y-5 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-ink-100">
+              {demoResult.timeline.map((s) => (
+                <li key={s.step_number} className="relative flex gap-4">
+                  <span className="relative z-10 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-signal-600 text-[12px] font-extrabold text-white ring-4 ring-white">{s.step_number}</span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-[13.5px] font-bold text-ink-900">{s.title}</p>
+                      <span className="shrink-0 text-[11px] font-semibold text-ink-300 tabnum">{clockTime(s.timestamp)}</span>
+                    </div>
+                    <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-400">{s.status}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+      </div>
+    )}
+  </div>
+);

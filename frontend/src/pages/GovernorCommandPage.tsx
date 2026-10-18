@@ -1,112 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { ApiService } from '../services/api';
 import type { Hospital, Emergency, Match, Referral, AuditEvent, GovernorStatistics, AppNotification, UserRole } from '../types';
+import type { TabId } from '../config/workspace';
 import { clockTime } from '../utils/time';
+import { cleanName, emergencyStatusTone, lifecycleIndex, LIFECYCLE, relTime, severityTone, titleCase, referralTone } from '../utils/format';
 import { MapComponent } from '../components/MapComponent';
-import { 
-  ShieldAlert, 
-  Activity, 
-  Building2, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  RefreshCw, 
-  Bed,
-  Stethoscope,
-  ChevronRight,
-  Sliders,
-  Send,
-  Flame,
-  HeartPulse,
-  Car,
-  MapPin,
-  Check,
-  Bell,
-  AlertTriangle,
-  LogIn
+import { useConfirm, useToast } from '../ui/UIProvider';
+import { Alert, Badge, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, Skeleton, StatCard } from '../ui/primitives';
+import {
+  Activity, AlertTriangle, Bed, Bell, Building2, Car, Check, CheckCircle2, Clock, Flame, HeartPulse, LogIn, MapPin,
+  Radar, RefreshCw, ScrollText, ShieldAlert, Siren, Sliders, Stethoscope, Trophy, Zap,
 } from 'lucide-react';
 
-interface GovernorCommandPageProps {
+interface Props {
   hospitals: Hospital[];
   onRefreshHospitals: () => void;
   activeEmergency: Emergency | null;
   onOpenExplain: (emergencyId: string) => void;
-  onNavigateToHospital: () => void;
+  onNavigate: (tab: TabId) => void;
   onEmergencyTriggered?: (emergency: Emergency) => void;
   currentRole?: UserRole;
 }
 
 const EMPTY_STATS: GovernorStatistics = {
-  total_emergencies: 0,
-  active_emergencies: 0,
-  total_hospitals: 0,
-  hospitals_accepting: 0,
-  total_beds: 0,
-  available_beds: 0,
-  referrals_accepted: 0,
-  referrals_rejected: 0,
-  referrals_timed_out: 0,
-  reroutes_count: 0,
-  average_matching_time_ms: 0,
-  stale_hospitals_count: 0
+  total_emergencies: 0, active_emergencies: 0, total_hospitals: 0, hospitals_accepting: 0, total_beds: 0, available_beds: 0,
+  referrals_accepted: 0, referrals_rejected: 0, referrals_timed_out: 0, reroutes_count: 0, average_matching_time_ms: 0, stale_hospitals_count: 0,
 };
 
 const QUICK_PRESETS = [
-  {
-    title: "Motorcycle Trauma",
-    location: "Admiralty Way, Lekki",
-    category: "Road accident",
-    lat: 6.4474,
-    lng: 3.4731,
-    description: "High-speed motorcycle collision with severe head injury and active hemorrhage.",
-    icon: Car,
-    severity: "CRITICAL",
-    patients: 1
-  },
-  {
-    title: "Acute Chest Pain / STEMI",
-    location: "Ozumba Mbadiwe, VI",
-    category: "Chest pain",
-    lat: 6.4281,
-    lng: 3.4219,
-    description: "55yo male experiencing severe substernal pressure, diaphoresis and acute ischemia.",
-    icon: HeartPulse,
-    severity: "CRITICAL",
-    patients: 1
-  },
-  {
-    title: "Highway Multi-Rollover",
-    location: "Third Mainland Bridge",
-    category: "Road accident",
-    lat: 6.4712,
-    lng: 3.3982,
-    description: "3-car pileup with trapped passengers requiring trauma surgery and ICU admission.",
-    icon: Flame,
-    severity: "CRITICAL",
-    patients: 3
-  }
+  { title: 'Motorcycle trauma', location: 'Admiralty Way, Lekki', category: 'Road accident', lat: 6.4474, lng: 3.4731, description: 'High-speed motorcycle collision with severe head injury and active hemorrhage.', icon: Car, severity: 'Critical', patients: 1 },
+  { title: 'Acute chest pain / STEMI', location: 'Ozumba Mbadiwe, VI', category: 'Chest pain', lat: 6.4281, lng: 3.4219, description: '55yo male experiencing severe substernal pressure, diaphoresis and acute ischemia.', icon: HeartPulse, severity: 'Critical', patients: 1 },
+  { title: 'Highway multi-rollover', location: 'Third Mainland Bridge', category: 'Road accident', lat: 6.4712, lng: 3.3982, description: '3-car pileup with trapped passengers requiring trauma surgery and ICU admission.', icon: Flame, severity: 'Critical', patients: 3 },
 ];
 
-export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
-  hospitals,
-  onRefreshHospitals,
-  activeEmergency,
-  onOpenExplain,
-  onNavigateToHospital,
-  onEmergencyTriggered,
-  currentRole = 'ADMIN'
+export const GovernorCommandPage: React.FC<Props> = ({
+  hospitals, onRefreshHospitals, activeEmergency, onOpenExplain, onNavigate, onEmergencyTriggered, currentRole = 'ADMIN',
 }) => {
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [stats, setStats] = useState<GovernorStatistics>(EMPTY_STATS);
   const [liveEmergency, setLiveEmergency] = useState<Emergency | null>(activeEmergency);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [timeline, setTimeline] = useState<AuditEvent[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [activeReferrals, setActiveReferrals] = useState<Referral[]>([]);
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isTriggeringPreset, setIsTriggeringPreset] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [busyPreset, setBusyPreset] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const lastStatus = useRef<string | null>(null);
+
+  const canOperate = currentRole === 'ADMIN' || currentRole === 'HOSPITAL_STAFF';
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -115,28 +63,33 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
         ApiService.getStatistics().catch(() => null),
         ApiService.getTimeline().catch(() => ({ events: [] })),
         ApiService.getReferrals().catch(() => null),
-        ApiService.getNotifications(8).catch(() => [])
+        ApiService.getNotifications(8).catch(() => []),
       ]);
-      if (!statsData) {
-        setLoadError('Cannot reach the ER-Sync backend. Figures below are not live.');
-      } else {
-        setLoadError(null);
-        setStats(statsData);
-      }
+      if (!statsData) setLoadError('Cannot reach the ER-Sync backend. Figures below are not live.');
+      else { setLoadError(null); setStats(statsData); }
       if (timelineData && timelineData.events) setTimeline(timelineData.events);
       if (referralsData) setActiveReferrals(referralsData);
       setNotifications(notifData || []);
 
       if (activeEmergency) {
         const fresh = await ApiService.getEmergency(activeEmergency.id).catch(() => null);
-        if (fresh) setLiveEmergency(fresh);
+        if (fresh) {
+          setLiveEmergency(fresh);
+          // Surface lifecycle changes as they happen
+          if (lastStatus.current && lastStatus.current !== fresh.status) {
+            const tone = emergencyStatusTone(fresh.status);
+            const msg = `${fresh.incident_reference} is now ${titleCase(fresh.status)}`;
+            if (tone === 'alert') toast.error(msg); else if (tone === 'signal') toast.success(msg); else toast.info(msg);
+          }
+          lastStatus.current = fresh.status;
+        }
         const matchRes = await ApiService.getMatches(activeEmergency.id).catch(() => ({ matches: [] }));
         if (matchRes && matchRes.matches) {
           setMatches(matchRes.matches);
           const topMatch = matchRes.matches.find((m: Match) => m.eligibility && m.rank === 1);
           if (topMatch) {
-            const hosp = hospitals.find(h => h.id === topMatch.hospital_id);
-            if (hosp) setSelectedHospital(hosp);
+            const hosp = hospitals.find((h) => h.id === topMatch.hospital_id);
+            if (hosp) setSelectedHospital((prev) => prev ?? hosp);
           }
         }
       }
@@ -144,392 +97,333 @@ export const GovernorCommandPage: React.FC<GovernorCommandPageProps> = ({
       console.error('Failed to load command data', err);
     } finally {
       setIsLoading(false);
+      setLoadedOnce(true);
     }
   };
 
   useEffect(() => {
     setLiveEmergency(activeEmergency);
+    lastStatus.current = activeEmergency?.status ?? null;
+    setSelectedHospital(null);
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
-  }, [activeEmergency]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEmergency?.id]);
 
-  const runCaseAction = async (label: string, fn: () => Promise<any>) => {
+  const runCaseAction = async (key: string, successTitle: string, successMsg: string, fn: () => Promise<any>) => {
+    setBusyAction(key);
     try {
       await fn();
-      setActionMsg({ ok: true, text: label });
+      toast.success(successTitle, { message: successMsg });
       fetchData();
       onRefreshHospitals();
     } catch (e: any) {
-      setActionMsg({ ok: false, text: e?.message || 'Action failed' });
+      toast.error('Action failed', { message: e?.message || 'Please try again.' });
+    } finally {
+      setBusyAction(null);
     }
-    setTimeout(() => setActionMsg(null), 5000);
+  };
+
+  const markArrived = async () => {
+    if (!liveEmergency) return;
+    const ok = await confirm({
+      title: 'Mark patient as arrived?',
+      message: 'The reserved bed will switch to occupied and the hospital will be notified that the patient is on site.',
+      confirmLabel: 'Confirm arrival',
+      icon: LogIn,
+    });
+    if (ok) runCaseAction('arrive', 'Patient arrived', 'Bed is now marked occupied.', () => ApiService.markArrived(liveEmergency.id));
+  };
+
+  const closeCase = async () => {
+    if (!liveEmergency) return;
+    const ok = await confirm({
+      title: 'Close this case?',
+      message: 'This ends the incident and releases the reserved bed back to the hospital. This cannot be undone.',
+      confirmLabel: 'Close case & release bed',
+      tone: 'warn',
+      icon: Check,
+    });
+    if (ok) runCaseAction('close', 'Case closed', 'Bed released back to the hospital.', () => ApiService.closeCase(liveEmergency.id));
   };
 
   const handleQuickTrigger = async (preset: typeof QUICK_PRESETS[0]) => {
-    setIsTriggeringPreset(true);
+    setBusyPreset(preset.title);
     try {
       const em = await ApiService.createEmergency({
-        latitude: preset.lat,
-        longitude: preset.lng,
-        location_name: preset.location,
-        description: preset.description,
-        category: preset.category,
-        patient_count: preset.patients,
-        caller_phone: "+234 802 000 1122"
+        latitude: preset.lat, longitude: preset.lng, location_name: preset.location, description: preset.description,
+        category: preset.category, patient_count: preset.patients, caller_phone: '+234 802 000 1122',
       });
-      if (onEmergencyTriggered) {
-        onEmergencyTriggered(em);
-      }
-      fetchData();
+      toast.success('Emergency dispatched', { message: `${em.incident_reference} — matching the best hospital now.` });
+      onEmergencyTriggered?.(em);
       onRefreshHospitals();
     } catch (e: any) {
-      setActionMsg({ ok: false, text: e?.message || 'Failed to trigger emergency' });
-      setTimeout(() => setActionMsg(null), 5000);
+      toast.error('Could not dispatch emergency', { message: e?.message });
     } finally {
-      setIsTriggeringPreset(false);
+      setBusyPreset(null);
     }
   };
 
+  const openReferrals = activeReferrals.filter((r) => r.status === 'REQUESTED' || r.status === 'ACCEPTED');
+  const step = lifecycleIndex(liveEmergency?.status);
+  const problem = liveEmergency && step === -1;
+  const eligible = matches.filter((m) => m.eligibility);
+  const excluded = matches.length - eligible.length;
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {loadError && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{loadError}</span>
-        </div>
-      )}
-      {actionMsg && (
-        <div className={`p-3 rounded-xl text-xs font-bold border ${actionMsg.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
-          {actionMsg.text}
-        </div>
-      )}
+    <div className="space-y-6">
+      <PageHeader
+        icon={Radar}
+        eyebrow="Live dispatch grid"
+        title="Command Center"
+        description="Every active case, referral and bed reservation across the network — updated every few seconds."
+        actions={
+          <>
+            <Button variant="secondary" icon={RefreshCw} loading={isLoading && loadedOnce} onClick={fetchData}>Refresh</Button>
+            {(currentRole === 'ADMIN' || currentRole === 'PATIENT') && (
+              <Button variant="danger" icon={Siren} onClick={() => onNavigate('intake')}>Report emergency</Button>
+            )}
+          </>
+        }
+      />
 
-      {/* 6-Metric KPI Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hospitals Online</span>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">{stats.hospitals_accepting} / {stats.total_hospitals}</div>
-        </div>
+      {loadError && <Alert tone="warn" icon={AlertTriangle}>{loadError}</Alert>}
 
-        <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Free Beds</span>
-          <div className="text-xl sm:text-2xl font-black text-blue-600">{stats.available_beds} / {stats.total_beds}</div>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Match Latency</span>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">{stats.average_matching_time_ms > 0 ? `${Math.round(stats.average_matching_time_ms)} ms` : '—'}</div>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Triage</span>
-          <div className="text-xl sm:text-2xl font-black text-slate-900">{stats.total_emergencies}</div>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Admitted</span>
-          <div className="text-xl sm:text-2xl font-black text-emerald-600">{stats.referrals_accepted}</div>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Failovers</span>
-          <div className="text-xl sm:text-2xl font-black text-amber-600">{stats.reroutes_count}</div>
-        </div>
+      {/* KPI ribbon */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <StatCard label="Hospitals online" icon={Building2} tone="signal" loading={!loadedOnce} value={<>{stats.hospitals_accepting}<span className="text-[16px] font-bold text-ink-300"> / {stats.total_hospitals}</span></>} />
+        <StatCard label="Free beds" icon={Bed} tone="info" loading={!loadedOnce} value={<>{stats.available_beds}<span className="text-[16px] font-bold text-ink-300"> / {stats.total_beds}</span></>} />
+        <StatCard label="Match speed" icon={Zap} tone="plum" loading={!loadedOnce} value={stats.average_matching_time_ms > 0 ? <>{Math.round(stats.average_matching_time_ms)}<span className="text-[16px] font-bold text-ink-300"> ms</span></> : '—'} />
+        <StatCard label="Active cases" icon={Activity} tone="alert" loading={!loadedOnce} value={stats.active_emergencies} hint={`${stats.total_emergencies} total`} />
+        <StatCard label="Admitted" icon={CheckCircle2} tone="signal" loading={!loadedOnce} value={stats.referrals_accepted} />
+        <StatCard label="Failovers" icon={ShieldAlert} tone="warn" loading={!loadedOnce} value={stats.reroutes_count} />
       </div>
 
-      {/* Main 2-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column (7 cols): Active Incident & Candidates */}
-        <div className="lg:col-span-7 space-y-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        {/* ───── Left ───── */}
+        <div className="space-y-6 xl:col-span-7">
           {activeEmergency && liveEmergency ? (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5">
-              {/* Emergency Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-xs font-black border border-rose-200 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
-                      {liveEmergency.severity}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-500">
-                      {liveEmergency.incident_reference}
-                    </span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
-                      liveEmergency.status === 'NO_MATCH' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                      liveEmergency.status === 'AWAITING_ACCEPTANCE' || liveEmergency.status === 'REROUTING' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                      liveEmergency.status === 'CLOSED' || liveEmergency.status === 'CANCELLED' ? 'bg-slate-100 text-slate-600 border-slate-200' :
-                      'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      {liveEmergency.status.replace(/_/g, ' ')}
-                    </span>
+            <Card className="!p-0 overflow-hidden">
+              {/* Incident header */}
+              <div className={clsx('border-b p-5 sm:p-6', liveEmergency.severity === 'CRITICAL' ? 'border-alert-100 bg-gradient-to-br from-alert-50 to-white' : 'border-ink-100')}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={severityTone(liveEmergency.severity)} dot pulse={liveEmergency.severity === 'CRITICAL'}>{titleCase(liveEmergency.severity)}</Badge>
+                  <Badge tone={emergencyStatusTone(liveEmergency.status)}>{titleCase(liveEmergency.status)}</Badge>
+                  <span className="text-[12.5px] font-bold text-ink-500 tabnum">{liveEmergency.incident_reference}</span>
+                </div>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h2 className="text-[20px] font-extrabold text-ink-900">{liveEmergency.category} · {liveEmergency.patient_count} patient{liveEmergency.patient_count === 1 ? '' : 's'}</h2>
+                    <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-ink-500"><MapPin className="size-4 text-ink-400" />{liveEmergency.location_name}</p>
+                    <p className="mt-2 max-w-xl text-[13px] font-medium leading-relaxed text-ink-500">{liveEmergency.description}</p>
                   </div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">
-                    {liveEmergency.category} &bull; {liveEmergency.patient_count} Casualty
-                  </h2>
-                  <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    {liveEmergency.location_name}
-                  </p>
+                  <Button variant="secondary" size="sm" icon={Sliders} onClick={() => onOpenExplain(liveEmergency.id)} className="shrink-0 self-start">Decision audit</Button>
                 </div>
 
-                <button
-                  onClick={() => onOpenExplain(liveEmergency.id)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition self-start cursor-pointer"
-                >
-                  <Sliders className="w-3.5 h-3.5" />
-                  <span>Explainability Audit</span>
-                </button>
+                {/* Lifecycle tracker */}
+                {!problem ? (
+                  <div className="mt-5 overflow-x-auto no-scrollbar">
+                    <ol className="flex min-w-[560px] items-center">
+                      {LIFECYCLE.map((label, i) => {
+                        const done = i < step;
+                        const current = i === step;
+                        return (
+                          <li key={label} className="flex flex-1 items-center last:flex-none">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <span className={clsx('inline-flex size-7 items-center justify-center rounded-full text-[11px] font-extrabold transition-all',
+                                done ? 'bg-signal-600 text-white' : current ? 'bg-signal-100 text-signal-800 ring-4 ring-signal-100' : 'bg-ink-100 text-ink-400')}>
+                                {done ? <Check className="size-3.5" strokeWidth={3.5} /> : i + 1}
+                              </span>
+                              <span className={clsx('whitespace-nowrap text-[10.5px] font-bold', current ? 'text-ink-900' : done ? 'text-signal-700' : 'text-ink-300')}>{label}</span>
+                            </div>
+                            {i < LIFECYCLE.length - 1 && <span className={clsx('mx-1.5 mb-5 h-0.5 flex-1 rounded-full', done ? 'bg-signal-500' : 'bg-ink-100')} />}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                ) : (
+                  liveEmergency.status === 'NO_MATCH' && (
+                    <Alert tone="alert" icon={AlertTriangle} title="No eligible hospital right now" className="mt-5">
+                      Every candidate rejected, timed out or fails a mandatory requirement. Check the decision audit, then retry the dispatch.
+                    </Alert>
+                  )
+                )}
               </div>
 
-              {/* Case lifecycle actions */}
-              {(currentRole === 'ADMIN' || currentRole === 'HOSPITAL_STAFF') && (
-                <div className="flex flex-wrap gap-2">
+              {/* Case actions */}
+              {canOperate && (liveEmergency.status === 'NO_MATCH' || liveEmergency.status === 'PATIENT_EN_ROUTE' || liveEmergency.status === 'ARRIVED') && (
+                <div className="flex flex-wrap gap-2 border-b border-ink-100 bg-ink-25 px-5 py-3.5 sm:px-6">
                   {liveEmergency.status === 'NO_MATCH' && (
-                    <button
-                      onClick={() => runCaseAction('Re-dispatched on live hospital data', () => ApiService.redispatchEmergency(liveEmergency.id))}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold cursor-pointer"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> Retry dispatch
-                    </button>
+                    <Button variant="danger" size="sm" icon={RefreshCw} loading={busyAction === 'retry'}
+                      onClick={() => runCaseAction('retry', 'Dispatch retried', 'Re-matched on live hospital data.', () => ApiService.redispatchEmergency(liveEmergency.id))}>
+                      Retry dispatch
+                    </Button>
                   )}
                   {liveEmergency.status === 'PATIENT_EN_ROUTE' && (
-                    <button
-                      onClick={() => runCaseAction('Patient marked arrived - bed now occupied', () => ApiService.markArrived(liveEmergency.id))}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer"
-                    >
-                      <LogIn className="w-3.5 h-3.5" /> Mark patient arrived
-                    </button>
+                    <Button variant="primary" size="sm" icon={LogIn} loading={busyAction === 'arrive'} onClick={markArrived}>Mark patient arrived</Button>
                   )}
                   {(liveEmergency.status === 'ARRIVED' || liveEmergency.status === 'PATIENT_EN_ROUTE') && (
-                    <button
-                      onClick={() => runCaseAction('Case closed - bed released', () => ApiService.closeCase(liveEmergency.id))}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold cursor-pointer"
-                    >
-                      <Check className="w-3.5 h-3.5" /> Close case &amp; release bed
-                    </button>
+                    <Button variant="secondary" size="sm" icon={Check} loading={busyAction === 'close'} onClick={closeCase}>Close case & release bed</Button>
                   )}
                 </div>
               )}
-              {liveEmergency.status === 'NO_MATCH' && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold">
-                  No eligible hospital right now (all rejected, timed out, or fail a mandatory requirement). Check the audit trail, then retry.
-                </div>
-              )}
 
-              {/* Requirements Chips */}
-              {liveEmergency.requirements && liveEmergency.requirements.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {liveEmergency.requirements.map((req, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1.5 text-xs bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg font-bold"
-                    >
-                      {req.requirement_type === 'SPECIALTY' ? (
-                        <Stethoscope className="w-3.5 h-3.5 text-blue-600" />
-                      ) : req.requirement_type === 'FACILITY' ? (
-                        <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                      ) : (
-                        <Bed className="w-3.5 h-3.5 text-emerald-600" />
-                      )}
-                      <span>{req.requirement_name}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="space-y-5 p-5 sm:p-6">
+                {/* Requirements */}
+                {liveEmergency.requirements && liveEmergency.requirements.length > 0 && (
+                  <div>
+                    <p className="eyebrow mb-2.5">Clinical requirements</p>
+                    <div className="flex flex-wrap gap-2">
+                      {liveEmergency.requirements.map((req, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1.5 rounded-xl border border-ink-100 bg-ink-25 px-2.5 py-1.5 text-[12.5px] font-semibold text-ink-700">
+                          {req.requirement_type === 'SPECIALTY' ? <Stethoscope className="size-3.5 text-info-600" /> : req.requirement_type === 'FACILITY' ? <Building2 className="size-3.5 text-plum-600" /> : <Bed className="size-3.5 text-signal-600" />}
+                          {req.requirement_name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              {/* Candidate Rankings */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <span>Candidate Facility Rankings</span>
-                  <span>Match Score</span>
-                </div>
-
-                <div className="space-y-2.5">
-                  {matches.filter(m => m.eligibility).slice(0, 4).map((match, idx) => {
-                    const hosp = hospitals.find(h => h.id === match.hospital_id);
-                    const isTop = match.rank === 1;
-
-                    return (
-                      <div
-                        key={match.id || idx}
-                        onClick={() => hosp && setSelectedHospital(hosp)}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                          selectedHospital?.id === hosp?.id
-                            ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100 shadow-xs'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
-                              isTop ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700'
-                            }`}>
-                              #{match.rank}
+                {/* Ranking */}
+                <div>
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <p className="eyebrow">Candidate hospitals</p>
+                    <span className="text-[11.5px] font-semibold text-ink-400">{excluded > 0 ? `${excluded} excluded by safety filters` : 'Match score /100'}</span>
+                  </div>
+                  {eligible.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {eligible.slice(0, 4).map((match, idx) => {
+                        const hosp = hospitals.find((h) => h.id === match.hospital_id);
+                        const isTop = match.rank === 1;
+                        const selected = selectedHospital?.id === hosp?.id;
+                        return (
+                          <button
+                            key={match.id || idx}
+                            onClick={() => hosp && setSelectedHospital(hosp)}
+                            className={clsx('flex w-full items-center gap-3.5 rounded-2xl border p-3.5 text-left transition active:scale-[.99]',
+                              selected ? 'border-signal-300 bg-signal-50/50 ring-4 ring-signal-100' : 'border-ink-100 bg-white hover:border-ink-200')}
+                          >
+                            <span className={clsx('inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-extrabold', isTop ? 'bg-signal-600 text-white' : 'bg-ink-50 text-ink-600')}>
+                              {isTop ? <Trophy className="size-4" /> : `#${match.rank}`}
                             </span>
-                            <div>
-                              <div className="text-xs sm:text-sm font-black text-slate-900">
-                                {hosp?.name.replace('SIMULATED HOSPITAL — ', '') || match.hospital_id}
-                              </div>
-                              <div className="text-[11px] text-slate-500 font-medium">
-                                {match.eta_minutes}m ETA &bull; {match.distance_km} km &bull; {hosp?.available_emergency_beds || 0} beds free
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2.5">
-                            {isTop && (
-                              <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md hidden sm:inline">
-                                RECOMMENDED
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-2">
+                                <span className="truncate text-[14px] font-bold text-ink-900">{cleanName(hosp?.name) || match.hospital_id}</span>
+                                {isTop && <Badge tone="signal" small className="hidden sm:inline-flex">Recommended</Badge>}
                               </span>
-                            )}
-                            <span className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-xs font-black">
-                              {Math.round(match.score)}
+                              <span className="mt-0.5 block text-[12px] font-medium text-ink-500">{match.eta_minutes} min ETA · {match.distance_km} km · {hosp?.available_emergency_beds ?? 0} beds free</span>
                             </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                            <span className="shrink-0 rounded-xl bg-ink-900 px-3 py-1.5 text-[14px] font-extrabold text-white tabnum">{Math.round(match.score)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <EmptyState compact icon={Building2} title="No eligible hospitals yet" description="Rankings appear as soon as matching completes." />
+                  )}
                 </div>
               </div>
-            </div>
+            </Card>
           ) : (
-            /* Quick Dispatch Simulator */
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-sm font-black text-slate-900">Instant Incident Triage</h3>
-                </div>
-                <span className="text-[11px] font-bold text-slate-400">Select to simulate</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {QUICK_PRESETS.map((p, idx) => (
+            <Card>
+              <CardHeader icon={ShieldAlert} tone="alert" title="No active incident selected" subtitle="Dispatch a simulated emergency to watch the engine work" />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {QUICK_PRESETS.map((p) => (
                   <button
-                    key={idx}
+                    key={p.title}
                     onClick={() => handleQuickTrigger(p)}
-                    disabled={isTriggeringPreset}
-                    className="p-3.5 bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-blue-300 rounded-xl text-left transition space-y-2 group cursor-pointer"
+                    disabled={!!busyPreset}
+                    className="group flex flex-col gap-3 rounded-2xl border border-ink-100 bg-ink-25 p-4 text-left transition hover:border-alert-200 hover:bg-alert-50/40 active:scale-[.98] disabled:opacity-60"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 group-hover:text-blue-600 transition">
-                        <p.icon className="w-4 h-4" />
-                      </div>
-                      <span className="text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded">
-                        {p.severity}
-                      </span>
+                      <IconTile icon={busyPreset === p.title ? RefreshCw : p.icon} tone="alert" size="sm" className={busyPreset === p.title ? '[&>svg]:animate-spin' : ''} />
+                      <Badge tone="alert" small>{p.severity}</Badge>
                     </div>
-                    <div>
-                      <div className="text-xs font-black text-slate-900 group-hover:text-blue-600 transition">
-                        {p.title}
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                        {p.location}
-                      </div>
-                    </div>
+                    <span>
+                      <span className="block text-[14px] font-bold text-ink-900">{p.title}</span>
+                      <span className="mt-0.5 block text-[12px] font-medium text-ink-500">{p.location}</span>
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
 
-          {/* Referral Dispatches */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs font-bold text-slate-900">
-              <span className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-600" />
-                Live Dispatches &amp; Bed Reservations
-              </span>
-              <span className="text-slate-400 font-bold">{activeReferrals.filter(r => r.status === 'REQUESTED' || r.status === 'ACCEPTED').length} Active</span>
-            </div>
-
-            {activeReferrals.some(r => r.status === 'REQUESTED' || r.status === 'ACCEPTED') ? (
-              <div className="space-y-2">
-                {activeReferrals.filter(r => r.status === 'REQUESTED' || r.status === 'ACCEPTED').slice(0, 5).map((ref) => (
-                  <div key={ref.id} className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-black text-slate-900">{ref.hospital_name || ref.hospital_id}</div>
-                      <div className="text-[11px] text-slate-500 font-medium">ETA: {ref.eta_minutes}m &bull; Ref: {ref.id.slice(0, 8)}</div>
+          {/* Live dispatches */}
+          <Card>
+            <CardHeader icon={Activity} tone="signal" title="Live dispatches & bed reservations" subtitle="Referrals awaiting a response or holding a bed" right={<Badge tone="neutral">{openReferrals.length} active</Badge>} />
+            {!loadedOnce ? (
+              <div className="space-y-2.5"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
+            ) : openReferrals.length > 0 ? (
+              <div className="space-y-2.5">
+                {openReferrals.slice(0, 6).map((ref) => (
+                  <div key={ref.id} className="flex items-center gap-3.5 rounded-2xl border border-ink-100 bg-ink-25 p-3.5">
+                    <IconTile icon={Building2} tone={referralTone(ref.status)} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-bold text-ink-900">{cleanName(ref.hospital_name || ref.hospital_id)}</p>
+                      <p className="text-[12px] font-medium text-ink-500">ETA {ref.eta_minutes} min · {relTime(ref.requested_at)}</p>
                     </div>
-                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
-                      ref.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
-                      ref.status === 'REJECTED' || ref.status === 'TIMEOUT' ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {ref.status}
-                    </span>
+                    <Badge tone={referralTone(ref.status)} dot pulse={ref.status === 'REQUESTED'}>{ref.status === 'REQUESTED' ? 'Awaiting' : titleCase(ref.status)}</Badge>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-slate-400 py-3 text-center font-medium">No active patient dispatches in queue.</div>
+              <EmptyState compact icon={Activity} title="Nothing in the queue" description="New dispatches will appear here the moment they're sent." />
             )}
-          </div>
+          </Card>
         </div>
 
-        {/* Right Column (5 cols): Map & Timeline */}
-        <div className="lg:col-span-5 space-y-6">
-          <MapComponent
-            hospitals={hospitals}
-            emergency={activeEmergency}
-            selectedHospital={selectedHospital}
-            height="320px"
-            onSelectHospital={setSelectedHospital}
-          />
+        {/* ───── Right ───── */}
+        <div className="space-y-6 xl:col-span-5">
+          <MapComponent hospitals={hospitals} emergency={activeEmergency} selectedHospital={selectedHospital} height="340px" onSelectHospital={setSelectedHospital} />
 
-          {/* Audit Timeline */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs font-bold text-slate-900">
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-slate-500" />
-                Live Dispatch Audit Trail
-              </span>
-              <button onClick={fetchData} className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer">
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-              {timeline.slice(0, 6).map((evt, idx) => (
-                <div key={evt.id || idx} className="flex items-start gap-2.5 text-xs pb-2 border-b border-slate-100 last:border-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0"></span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 truncate">{(evt as any).event_type || evt.action}</span>
-                      <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-1">
-                        {clockTime(evt.created_at || (evt as any).timestamp)}
-                      </span>
+          <Card>
+            <CardHeader icon={Clock} tone="neutral" title="Dispatch audit trail" subtitle="Latest system events"
+              right={<Button variant="ghost" size="sm" iconOnly icon={RefreshCw} onClick={fetchData} aria-label="Refresh" className={isLoading ? '[&>svg]:animate-spin' : ''} />} />
+            {timeline.length > 0 ? (
+              <ol className="relative max-h-[320px] space-y-4 overflow-y-auto pr-1 before:absolute before:bottom-2 before:left-[5px] before:top-2 before:w-px before:bg-ink-100">
+                {timeline.slice(0, 7).map((evt, idx) => (
+                  <li key={evt.id || idx} className="relative flex gap-3.5 pl-0">
+                    <span className="relative z-10 mt-1.5 size-[11px] shrink-0 rounded-full border-2 border-white bg-signal-500 ring-1 ring-signal-200" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-[13px] font-bold text-ink-900">{titleCase((evt as any).event_type || evt.action)}</span>
+                        <span className="shrink-0 text-[11px] font-semibold text-ink-300 tabnum">{clockTime(evt.created_at || (evt as any).timestamp)}</span>
+                      </div>
+                      <p className="truncate text-[12px] font-medium text-ink-500">{cleanName((evt.metadata as any)?.hospital_name) || (evt.metadata as any)?.reason || (evt.metadata as any)?.trigger || evt.entity_type}</p>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">{(evt.metadata as any)?.hospital_name || (evt.metadata as any)?.reason || (evt.metadata as any)?.trigger || evt.entity_type}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <EmptyState compact icon={ScrollText} title="No events yet" />
+            )}
+            {currentRole === 'ADMIN' && timeline.length > 0 && (
+              <button onClick={() => onNavigate('audit')} className="mt-4 text-[12.5px] font-bold text-signal-700 hover:text-signal-800">View full audit trail →</button>
+            )}
+          </Card>
 
-          {/* Dispatch notifications */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100 text-xs font-bold text-slate-900">
-              <Bell className="w-4 h-4 text-slate-500" />
-              Alerts &amp; Notifications
-            </div>
+          <Card>
+            <CardHeader icon={Bell} tone="warn" title="Alerts" subtitle="Recent notifications" />
             {notifications.length > 0 ? (
-              <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+              <div className="max-h-[260px] space-y-3 overflow-y-auto pr-1">
                 {notifications.map((n) => (
-                  <div key={n.id} className="text-xs pb-2 border-b border-slate-100 last:border-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-slate-900 truncate">{n.title}</span>
-                      <span className="text-[10px] text-slate-400 font-mono shrink-0">{clockTime(n.created_at)}</span>
+                  <div key={n.id} className="rounded-xl bg-ink-25 p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[13px] font-bold text-ink-900">{n.title}</span>
+                      <span className="shrink-0 text-[11px] font-semibold text-ink-300 tabnum">{clockTime(n.created_at)}</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">{n.message}</p>
+                    <p className="mt-0.5 text-[12px] font-medium leading-relaxed text-ink-500">{n.message}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-slate-400 py-2 text-center font-medium">No alerts yet.</div>
+              <EmptyState compact icon={Bell} title="All quiet" description="No alerts yet." />
             )}
-          </div>
+            <button onClick={() => onNavigate('notifications')} className="mt-4 text-[12.5px] font-bold text-signal-700 hover:text-signal-800">Open all alerts →</button>
+          </Card>
         </div>
       </div>
     </div>

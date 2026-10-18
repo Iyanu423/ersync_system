@@ -74,43 +74,34 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       const isSelected = selectedHospital && selectedHospital.id === hosp.id;
       const isStale = hosp.is_stale;
       
-      let badgeColor = 'bg-emerald-600 border-white text-white shadow-md';
-      if (hosp.emergency_status === 'CLOSED' || !hosp.accepting_emergencies) {
-        badgeColor = 'bg-rose-600 border-white text-white shadow-md';
-      } else if (hosp.emergency_status === 'LIMITED' || isStale) {
-        badgeColor = 'bg-amber-500 border-white text-white shadow-md';
-      }
-      if (isSelected) {
-        badgeColor = 'bg-blue-600 border-white text-white ring-4 ring-blue-300 shadow-lg';
-      }
+      let bg = '#10A98B';
+      if (hosp.emergency_status === 'CLOSED' || !hosp.accepting_emergencies) bg = '#D93320';
+      else if (hosp.emergency_status === 'LIMITED' || isStale) bg = '#E5A00D';
+      if (isSelected) bg = '#121F38';
+      const ring = isSelected ? ';box-shadow:0 0 0 5px rgba(16,169,139,.35),0 6px 14px rgba(10,20,40,.35)' : ';box-shadow:0 4px 10px rgba(10,20,40,.3)';
 
       const iconHtml = `
-        <div class="relative group cursor-pointer flex items-center justify-center">
-          <div class="w-8 h-8 rounded-full ${badgeColor} border-2 flex items-center justify-center font-bold text-xs transition-transform transform hover:scale-110">
-            <span>H</span>
-          </div>
-          ${isSelected ? '<div class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></div>' : ''}
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <div style="width:34px;height:34px;border-radius:12px;background:${bg};border:2.5px solid #fff;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;font-family:Onest,sans-serif${ring}">+</div>
         </div>
       `;
 
       const customIcon = L.divIcon({
         html: iconHtml,
         className: 'custom-hospital-marker',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
+        iconSize: [34, 34],
+        iconAnchor: [17, 17]
       });
 
       const marker = L.marker([hosp.latitude, hosp.longitude], { icon: customIcon });
 
       const popupContent = `
-        <div class="p-2 space-y-1.5 min-w-[210px]">
-          <div class="font-bold text-xs text-slate-900">${hosp.name}</div>
-          <div class="text-[11px] text-slate-500">${hosp.address}</div>
-          <div class="flex items-center justify-between gap-2 text-[10px] pt-1.5 border-t border-slate-100">
-            <span class="px-2 py-0.5 rounded-full ${hosp.accepting_emergencies ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'} font-semibold">
-              ${hosp.accepting_emergencies ? 'ACCEPTING' : 'DIVERTED'}
-            </span>
-            <span class="text-slate-700 font-semibold">${hosp.available_emergency_beds} Beds Free</span>
+        <div style="min-width:210px;font-family:Onest,sans-serif">
+          <div style="font-weight:800;font-size:13px;color:#121F38">${hosp.name.replace('SIMULATED HOSPITAL — ', '')}</div>
+          <div style="font-size:11.5px;color:#61728B;margin-top:2px">${hosp.address}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #E4EAF2;font-size:11px">
+            <span style="padding:2px 8px;border-radius:99px;font-weight:700;background:${hosp.accepting_emergencies ? '#E8FBF6' : '#FFF2F0'};color:${hosp.accepting_emergencies ? '#0A6D5C' : '#B32716'}">${hosp.accepting_emergencies ? 'Accepting' : 'Diverted'}</span>
+            <span style="font-weight:700;color:#34445E">${hosp.available_emergency_beds} beds free</span>
           </div>
         </div>
       `;
@@ -127,12 +118,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     // 2. Render Emergency Pin (Clean SVG Icon, No Emojis)
     if (emergency) {
       const emergencyHtml = `
-        <div class="relative flex items-center justify-center">
-          <div class="w-8 h-8 rounded-full bg-rose-600 border-2 border-white flex items-center justify-center text-white shadow-lg pulse-red">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
+        <div class="pulse-red" style="width:34px;height:34px;border-radius:50%;background:#F04B39;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 14px rgba(240,75,57,.5)">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         </div>
       `;
 
@@ -145,13 +132,10 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
       const emgMarker = L.marker([emergency.latitude, emergency.longitude], { icon: emergencyIcon });
       emgMarker.bindPopup(`
-        <div class="p-2 space-y-1">
-          <div class="flex items-center gap-1 text-[11px] font-bold text-rose-700">
-            <span class="w-2 h-2 rounded-full bg-rose-600 animate-pulse"></span>
-            ACTIVE INCIDENT
-          </div>
-          <div class="text-xs text-slate-900 font-bold">${emergency.incident_reference} (${emergency.severity})</div>
-          <div class="text-[11px] text-slate-500">${emergency.location_name}</div>
+        <div style="font-family:Onest,sans-serif">
+          <div style="font-size:11px;font-weight:800;color:#B32716;letter-spacing:.06em">ACTIVE INCIDENT</div>
+          <div style="font-size:13px;font-weight:800;color:#121F38;margin-top:2px">${emergency.incident_reference} (${emergency.severity})</div>
+          <div style="font-size:11.5px;color:#61728B">${emergency.location_name}</div>
         </div>
       `);
 
@@ -169,7 +153,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           ];
 
       const polyline = L.polyline(routePoints, {
-        color: '#2563eb',
+        color: '#10A98B',
         weight: 4,
         opacity: 0.85,
         dashArray: '8, 8',
@@ -187,28 +171,14 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   }, [hospitals, emergency, selectedHospital, routeCoordinates, onSelectHospital]);
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
+    <div className="relative overflow-hidden rounded-[18px] border border-ink-100 bg-white shadow-[var(--shadow-card)]">
       <div ref={mapContainerRef} style={{ height, width: '100%' }} />
-      
-      {/* Clean Light Map Legend Overlay */}
-      <div className="absolute bottom-3 right-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 shadow-md text-xs space-y-1">
-        <div className="font-bold text-[10px] text-slate-500 uppercase tracking-wider mb-1">Legend</div>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-          <span className="text-[11px] text-slate-700">Accepting (Normal)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-          <span className="text-[11px] text-slate-700">Limited / Stale</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
-          <span className="text-[11px] text-slate-700">Closed / Diverted</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-600 ring-2 ring-rose-200"></span>
-          <span className="text-[11px] text-slate-700">Active Incident</span>
-        </div>
+
+      <div className="absolute bottom-3 left-3 z-[400] hidden space-y-1.5 rounded-2xl border border-ink-100 bg-white/95 px-3.5 py-3 shadow-[var(--shadow-lift)] backdrop-blur sm:block">
+        <div className="eyebrow !text-[9.5px]">Legend</div>
+        {[['#10A98B', 'Accepting'], ['#E5A00D', 'Limited / stale'], ['#D93320', 'Closed / diverted'], ['#F04B39', 'Active incident']].map(([c, l]) => (
+          <div key={l} className="flex items-center gap-2 text-[11.5px] font-semibold text-ink-700"><span className="size-2.5 rounded-full" style={{ background: c }} />{l}</div>
+        ))}
       </div>
     </div>
   );

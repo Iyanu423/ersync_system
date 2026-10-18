@@ -177,6 +177,12 @@ export class ApiService {
     return res.json();
   }
 
+  static async markNotificationRead(id: string) {
+    const res = await fetch(`${API_BASE}/notifications/${id}/read`, { method: 'POST', headers: this.getHeaders() });
+    if (!res.ok) throw await this.errorFrom(res, 'Failed to mark notification as read');
+    return res.json();
+  }
+
   // Referrals
   static async getReferrals(statusFilter?: string, hospitalId?: string): Promise<Referral[]> {
     const params = new URLSearchParams();

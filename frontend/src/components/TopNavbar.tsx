@@ -1,134 +1,82 @@
 import React from 'react';
-import type { UserRole, Hospital } from '../types';
-import { ApiService } from '../services/api';
-import { 
-  UserCheck, 
-  Building2, 
-  Zap, 
-  RefreshCw,
-  Menu,
-  Shield,
-  Activity,
-  ChevronDown
-} from 'lucide-react';
+import clsx from 'clsx';
+import { Bell, ChevronRight, Siren } from 'lucide-react';
+import type { UserRole } from '../types';
+import { NAV_ITEMS, ROLE_META, type TabId } from '../config/workspace';
+import { BrandMark } from './Sidebar';
+import { Badge } from '../ui/primitives';
 
 interface TopNavbarProps {
-  activeTab: string;
-  currentRole: UserRole;
-  setCurrentRole: (role: UserRole) => void;
-  hospitals: Hospital[];
-  selectedHospitalId?: string;
-  onSelectHospitalId?: (id: string) => void;
-  onRunDemo?: () => void;
-  isDemoRunning?: boolean;
-  onOpenMobileMenu?: () => void;
-  onNavigateToIntake?: () => void;
+  role: UserRole;
+  workspaceName: string;
+  activeTab: TabId;
+  onNavigate: (tab: TabId) => void;
+  onSwitchWorkspace: () => void;
+  unreadCount: number;
+  online: boolean;
+  canReport: boolean;
 }
 
-export const TopNavbar: React.FC<TopNavbarProps> = ({
-  activeTab,
-  currentRole,
-  setCurrentRole,
-  hospitals,
-  selectedHospitalId,
-  onSelectHospitalId,
-  onRunDemo,
-  isDemoRunning,
-  onOpenMobileMenu,
-  onNavigateToIntake
-}) => {
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const role = e.target.value as UserRole;
-    setCurrentRole(role);
-    ApiService.setRole(role, selectedHospitalId || 'hosp_lagos_central');
-  };
-
-  const getPageInfo = () => {
-    switch (activeTab) {
-      case 'command': 
-        return { title: 'Command Center', subtitle: 'Live Multi-Facility Dispatch Grid' };
-      case 'intake': 
-        return { title: 'Emergency Intake', subtitle: 'AI Clinical Triage & Dispatch' };
-      case 'hospital': 
-        return { title: 'Hospital Dashboard', subtitle: 'Facility Bed & Specialist Management' };
-      case 'network': 
-        return { title: 'Geospatial Grid', subtitle: 'Lagos Medical Infrastructure Map' };
-      case 'analytics': 
-        return { title: 'Analytics & KPIs', subtitle: 'System Performance & Referral Telemetry' };
-      case 'demo': 
-        return { title: 'Failover Simulation', subtitle: '1-Click End-to-End Stress Test' };
-      default: 
-        return { title: 'ER-Sync', subtitle: 'Emergency Coordination' };
-    }
-  };
-
-  const pageInfo = getPageInfo();
+export const TopNavbar: React.FC<TopNavbarProps> = ({ role, workspaceName, activeTab, onNavigate, onSwitchWorkspace, unreadCount, online, canReport }) => {
+  const meta = ROLE_META[role];
+  const page = NAV_ITEMS.find((n) => n.id === activeTab);
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 select-none">
-      {/* Page Title & Mobile Trigger */}
-      <div className="flex items-center gap-3 min-w-0">
-        <button
-          onClick={onOpenMobileMenu}
-          className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 border border-slate-200 transition cursor-pointer"
-          aria-label="Open Navigation Menu"
-        >
-          <Menu className="w-5 h-5 stroke-[2.5]" />
-        </button>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
-              {pageInfo.title}
-            </h1>
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-              Live Grid
-            </span>
+    <header className="pt-safe z-30 shrink-0 border-b border-ink-100 bg-white/85 backdrop-blur-xl">
+      <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        {/* Left: brand on mobile, breadcrumb on desktop */}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="lg:hidden"><BrandMark size={36} className="!bg-ink-950 ring-0" /></div>
+          <div className="hidden min-w-0 items-center gap-2 text-[13px] font-semibold lg:flex">
+            <span className="text-ink-400">{role === 'HOSPITAL_STAFF' ? workspaceName : meta.label}</span>
+            <ChevronRight className="size-4 text-ink-300" />
+            <span className="truncate text-ink-900">{page?.label}</span>
           </div>
-          <p className="hidden md:block text-[11px] text-slate-500 font-medium truncate">
-            {pageInfo.subtitle}
-          </p>
+          <div className="min-w-0 leading-tight lg:hidden">
+            <p className="truncate text-[15px] font-extrabold text-ink-900">{page?.label}</p>
+            <p className="truncate text-[11.5px] font-semibold text-ink-400">{role === 'HOSPITAL_STAFF' ? workspaceName : meta.label}</p>
+          </div>
         </div>
-      </div>
 
-      {/* Right Controls */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink min-w-0">
-        {/* Hospital selector when on hospital tab */}
-        {activeTab === 'hospital' && hospitals.length > 0 && onSelectHospitalId && (
-          <div className="hidden sm:flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs min-w-0 shrink">
-            <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0 stroke-[2.5]" />
-            <select
-              value={selectedHospitalId}
-              onChange={(e) => onSelectHospitalId(e.target.value)}
-              className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer w-full max-w-[40vw] sm:max-w-[250px] truncate text-xs min-w-0"
-            >
-              {hospitals.map(h => (
-                <option key={h.id} value={h.id}>
-                  {h.name.replace('SIMULATED HOSPITAL — ', '')}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Right */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="hidden sm:inline-flex">
+            <Badge tone={online ? 'signal' : 'alert'} dot pulse={online}>{online ? 'Live' : 'Offline'}</Badge>
+          </span>
 
-        {/* Demo Fast Trigger */}
-        {onRunDemo && activeTab !== 'demo' && (
+          {canReport && activeTab !== 'intake' && (
+            <button onClick={() => onNavigate('intake')} className="btn btn-danger btn-sm hidden sm:inline-flex">
+              <Siren className="size-4" strokeWidth={2.3} /> Report emergency
+            </button>
+          )}
+
           <button
-            onClick={onRunDemo}
-            disabled={isDemoRunning}
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition shadow-xs disabled:opacity-50 cursor-pointer"
+            onClick={() => onNavigate('notifications')}
+            aria-label={`Alerts${unreadCount ? `, ${unreadCount} unread` : ''}`}
+            className={clsx('relative inline-flex size-10 items-center justify-center rounded-xl border border-ink-100 bg-white text-ink-600 transition hover:border-ink-200 hover:text-ink-900', activeTab === 'notifications' && 'border-signal-200 bg-signal-50 text-signal-700')}
           >
-            {isDemoRunning ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Zap className="w-3.5 h-3.5 fill-white" />
+            <Bell className="size-[19px]" strokeWidth={2} />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-alert-500 px-1 text-[10px] font-extrabold text-white ring-2 ring-white tabnum">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
             )}
-            <span>Simulate Failover</span>
           </button>
-        )}
 
-
+          <button
+            onClick={onSwitchWorkspace}
+            className="flex h-10 items-center gap-2.5 rounded-xl border border-ink-100 bg-white pl-1.5 pr-3 transition hover:border-ink-200"
+            aria-label="Switch workspace"
+          >
+            <span className={clsx('inline-flex size-7 items-center justify-center rounded-lg', meta.tone === 'signal' ? 'bg-signal-50 text-signal-700' : meta.tone === 'alert' ? 'bg-alert-50 text-alert-600' : 'bg-info-50 text-info-600')}>
+              <meta.icon className="size-4" strokeWidth={2.2} />
+            </span>
+            <span className="hidden text-left leading-tight sm:block">
+              <span className="block text-[12.5px] font-bold text-ink-900">{meta.short}</span>
+              <span className="block text-[10.5px] font-semibold text-ink-400">Switch</span>
+            </span>
+          </button>
+        </div>
       </div>
     </header>
   );
