@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Inbox, RefreshCw, Search, Stethoscope, Building2, Bed, MapPin, Phone, Users, FileText } from 'lucide-react';
+import { Inbox, RefreshCw, Search, Stethoscope, Building2, Bed, Users, FileText } from 'lucide-react';
 import { ApiService } from '../services/api';
 import type { Hospital, Referral, UserRole } from '../types';
-import { Badge, Button, Card, EmptyState, KV, Modal, PageHeader, Segmented, Skeleton, StatCard } from '../ui/primitives';
+import { Badge, Button, Card, EmptyState, KV, Modal, PageHeader, Segmented, Select, Skeleton, StatCard } from '../ui/primitives';
 import { ReferralCard, useReferralResponder } from '../components/ReferralList';
 import { cleanName, referralTone, severityTone, shortTime, titleCase } from '../utils/format';
 import { parseUtc } from '../utils/time';
@@ -87,7 +87,7 @@ export const ReferralsPage: React.FC<Props> = ({ role, hospitalId, hospitals, on
         eyebrow={isStaff ? 'Incoming patients' : 'Network referrals'}
         title="Referrals"
         description={isStaff ? 'Patients ER-Sync has routed to your hospital. Respond before the timer ends or the case moves on automatically.' : 'Every referral sent across the network, with its outcome and response time.'}
-        actions={<Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={() => load(true)}>Refresh</Button>}
+        actions={<Button data-desktop-only variant="secondary" icon={RefreshCw} loading={refreshing} onClick={() => load(true)}>Refresh</Button>}
       />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -113,10 +113,8 @@ export const ReferralsPage: React.FC<Props> = ({ role, hospitalId, hospitals, on
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           {!isStaff && hospitals.length > 0 && (
-            <select className="input !h-10 sm:!w-60" value={hospitalFilter} onChange={(e) => setHospitalFilter(e.target.value)} aria-label="Filter by hospital">
-              <option value="ALL">All hospitals</option>
-              {hospitals.map((h) => <option key={h.id} value={h.id}>{cleanName(h.name)}</option>)}
-            </select>
+            <Select className="sm:w-60 [&_.input]:!h-10" title="Filter by hospital" value={hospitalFilter} onChange={setHospitalFilter}
+              options={[{ value: 'ALL', label: 'All hospitals' }, ...hospitals.map((h) => ({ value: h.id, label: cleanName(h.name) }))]} />
           )}
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-300" />
@@ -188,8 +186,8 @@ export const ReferralsPage: React.FC<Props> = ({ role, hospitalId, hospitals, on
             )}
 
             <div className="divide-y divide-ink-100">
-              {em && <KV label="Pick-up location"><span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5 text-ink-400" />{em.location_name}</span></KV>}
-              {em?.caller_phone && <KV label="Responder phone"><span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-ink-400" />{em.caller_phone}</span></KV>}
+              {em && <KV label="Pick-up location">{em.location_name}</KV>}
+              {em?.caller_phone && <KV label="Responder phone">{em.caller_phone}</KV>}
               <KV label="Estimated arrival">{detail.eta_minutes} min</KV>
               <KV label="Requested">{shortTime(detail.requested_at)} · {parseUtc(detail.requested_at).toLocaleDateString()}</KV>
               {detail.accepted_at && <KV label="Accepted">{shortTime(detail.accepted_at)}</KV>}

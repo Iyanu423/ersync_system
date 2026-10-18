@@ -25,7 +25,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ user, workspaceName, activ
   const page = NAV_ITEMS.find((n) => n.id === activeTab);
 
   return (
-    <header className="pt-safe z-30 shrink-0 border-b border-ink-100 bg-white/85 backdrop-blur-xl">
+    <header className="pt-safe z-30 shrink-0 select-none border-b border-ink-100 bg-white/85 backdrop-blur-xl">
       <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         {/* Left: brand on mobile, breadcrumb on desktop */}
         <div className="flex min-w-0 items-center gap-3">
@@ -36,7 +36,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ user, workspaceName, activ
             <span className="truncate text-ink-900">{page?.label}</span>
           </div>
           <div className="min-w-0 leading-tight lg:hidden">
-            <p className="truncate text-[15px] font-extrabold text-ink-900">{page?.label}</p>
+            <p className="truncate text-[16px] font-extrabold tracking-tight text-ink-900">ER-Sync</p>
             <p className="truncate text-[11.5px] font-semibold text-ink-400">{role === 'HOSPITAL_STAFF' ? workspaceName : meta.label}</p>
           </div>
         </div>

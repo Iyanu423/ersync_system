@@ -88,7 +88,7 @@ export const NotificationsPage: React.FC<{ onChanged?: () => void }> = ({ onChan
         description="Dispatch, referral and system events addressed to your workspace."
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={() => load(true)}>Refresh</Button>
+            <Button data-desktop-only variant="secondary" icon={RefreshCw} loading={refreshing} onClick={() => load(true)}>Refresh</Button>
             <Button variant="dark" icon={CheckCheck} loading={markingAll} disabled={!unread.length} onClick={markAll}>Mark all read</Button>
           </>
         }

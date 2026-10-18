@@ -70,7 +70,7 @@ export const NetworkMapPage: React.FC<Props> = ({ hospitals, activeEmergency, on
         eyebrow="Geospatial grid"
         title="Facility Map"
         description="Every registered hospital in the Lagos network with live status, free beds and data freshness."
-        actions={<Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={handleRefresh}>Refresh grid</Button>}
+        actions={<Button data-desktop-only variant="secondary" icon={RefreshCw} loading={refreshing} onClick={handleRefresh}>Refresh grid</Button>}
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

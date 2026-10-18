@@ -229,7 +229,7 @@ function AuthedApp({ user, onLogout }: { user: AuthUser; onLogout: () => void })
           />
 
           <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+90px)] lg:pb-0">
-            <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <div className="mx-auto w-full max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
               {!online && (
                 <Alert tone="alert" icon={WifiOff} title="Can't reach the ER-Sync backend" className="mb-6">
                   Figures may be out of date. Start the API server — this page reconnects automatically.

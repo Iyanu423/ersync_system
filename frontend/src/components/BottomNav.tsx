@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Grid2x2, LogOut, RotateCcw, UserRound, Siren, ChevronRight } from 'lucide-react';
 import type { UserRole } from '../types';
@@ -27,6 +27,17 @@ const Tab: React.FC<{ item: NavItem; active: boolean; count: number; onClick: ()
 
 export const BottomNav: React.FC<BottomNavProps> = ({ role, activeTab, onNavigate, onOpenAccount, onLogout, onResetSimulation, badges }) => {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // Hide the tab bar while the on-screen keyboard is up (like a native app), so it never floats over inputs.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const check = () => setKeyboardOpen(vv.height < window.innerHeight * 0.75);
+    vv.addEventListener('resize', check);
+    return () => vv.removeEventListener('resize', check);
+  }, []);
+
   const items = navFor(role);
   const get = (id: TabId) => items.find((i) => i.id === id)!;
 
@@ -37,12 +48,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role, activeTab, onNavigat
   const moreActive = rest.some((r) => r.id === activeTab);
   const moreBadge = rest.reduce((n, r) => n + (badges[r.id] || 0), 0);
 
-  const go = (id: TabId) => { setMoreOpen(false); onNavigate(id); };
+  const go = (id: TabId) => {
+    setMoreOpen(false);
+    if (id !== activeTab) { try { navigator.vibrate?.(8); } catch { /* unsupported */ } }
+    onNavigate(id);
+  };
   const meta = ROLE_META[role];
 
   return (
     <>
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/92 backdrop-blur-xl lg:hidden" aria-label="Primary">
+      <nav className={clsx('pb-safe fixed inset-x-0 bottom-0 z-40 select-none border-t border-ink-100 bg-white/90 backdrop-blur-xl transition-transform duration-200 lg:hidden', keyboardOpen && 'translate-y-full')} aria-label="Primary">
         <div className="mx-auto flex h-[62px] max-w-xl items-stretch px-1">
           {primary.slice(0, compact ? primary.length : 2).map((i) => (
             <Tab key={i.id} item={i} active={activeTab === i.id} count={badges[i.id] || 0} onClick={() => go(i.id)} />

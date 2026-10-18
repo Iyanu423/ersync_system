@@ -4,7 +4,7 @@ import { ApiService } from '../services/api';
 import type { Hospital, Referral } from '../types';
 import { useWorkspace } from '../ui/WorkspaceContext';
 import { useConfirm, useToast } from '../ui/UIProvider';
-import { Badge, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, ProgressBar, Segmented, StatCard, Switch } from '../ui/primitives';
+import { Badge, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, ProgressBar, Segmented, Select, StatCard, Switch } from '../ui/primitives';
 import { ReferralCard, useReferralResponder } from '../components/ReferralList';
 import { cleanName, hospitalTone, relTime } from '../utils/format';
 import { Activity, Bed, Building2, Check, Inbox, Minus, Phone, Plus, MapPin, Stethoscope, Power, Clock, TriangleAlert, ShieldOff } from 'lucide-react';
@@ -181,12 +181,8 @@ export const HospitalDashboardPage: React.FC<Props> = ({ hospitals, selectedHosp
         description="What you change here is what ER-Sync sees. Keep beds, specialists and equipment accurate and the network routes the right patients to you."
         actions={
           role === 'ADMIN' && hospitals.length > 0 ? (
-            <div className="relative">
-              <Building2 className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-signal-600" />
-              <select className="input !h-10 !w-full !pl-10 sm:!w-72" value={selectedHospitalId} onChange={(e) => onSelectHospitalId(e.target.value)} aria-label="Select hospital">
-                {hospitals.map((h) => <option key={h.id} value={h.id}>{cleanName(h.name)}</option>)}
-              </select>
-            </div>
+            <Select className="w-full sm:w-72" leadingIcon={Building2} title="Choose hospital" value={selectedHospitalId} onChange={onSelectHospitalId}
+              options={hospitals.map((h) => ({ value: h.id, label: cleanName(h.name), hint: h.address }))} />
           ) : undefined
         }
       />
@@ -256,7 +252,7 @@ export const HospitalDashboardPage: React.FC<Props> = ({ hospitals, selectedHosp
           <div className="mt-3 flex items-center gap-2">
             <Button variant="secondary" size="sm" iconOnly icon={Minus} onClick={() => handleQuickBedAdjust(-1)} aria-label="Decrease free beds" />
             <Button variant="primary" size="sm" iconOnly icon={Plus} onClick={() => handleQuickBedAdjust(1)} aria-label="Increase free beds" />
-            <span className="ml-1 text-[11.5px] font-semibold text-ink-400">Adjust live</span>
+            <span className="ml-1 hidden text-[11.5px] font-semibold text-ink-400 sm:inline">Adjust live</span>
           </div>
         </StatCard>
         <StatCard label="Specialists on duty" icon={Stethoscope} tone="plum" value={<>{onDuty}<span className="text-[16px] font-bold text-ink-300"> / {hospital.specialties?.length || 0}</span></>} hint="Used for clinical matching" />

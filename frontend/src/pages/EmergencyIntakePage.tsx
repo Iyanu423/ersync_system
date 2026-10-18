@@ -3,9 +3,9 @@ import clsx from 'clsx';
 import { ApiService } from '../services/api';
 import type { Emergency } from '../types';
 import { useToast } from '../ui/UIProvider';
-import { Alert, Badge, Button, Card, CardHeader, Field, IconTile, KV, Modal, PageHeader } from '../ui/primitives';
+import { Alert, Badge, Button, Card, CardHeader, Field, IconTile, KV, Modal, PageHeader, Select } from '../ui/primitives';
 import { severityTone, titleCase } from '../utils/format';
-import { Activity, Bed, Building2, Car, CheckCircle2, Flame, HeartPulse, MapPin, Phone, Radar, Send, ShieldCheck, Siren, Stethoscope, Users, Zap, TriangleAlert } from 'lucide-react';
+import { Activity, Bed, Building2, Car, CheckCircle2, Flame, HeartPulse, Radar, Send, ShieldCheck, Siren, Stethoscope, Users, Zap, TriangleAlert } from 'lucide-react';
 
 interface Props {
   onEmergencyCreated: (emergency: Emergency) => void;
@@ -107,7 +107,7 @@ export const EmergencyIntakePage: React.FC<Props> = ({ onEmergencyCreated, onNav
       />
 
       {/* How it works */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="hidden grid-cols-1 gap-3 sm:grid sm:grid-cols-3">
         {[
           { icon: Stethoscope, t: '1 · AI triage', d: 'Severity and clinical needs are extracted from your description.' },
           { icon: ShieldCheck, t: '2 · Safety filters', d: 'Hospitals without a bed, specialist or equipment are excluded.' },
@@ -146,17 +146,13 @@ export const EmergencyIntakePage: React.FC<Props> = ({ onEmergencyCreated, onNav
         <form onSubmit={openReview} className="space-y-5" noValidate>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Field label="Category">
-              <select className="input" value={category} onChange={(e) => { setCategory(e.target.value); markEdited(); }}>
-                {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-              </select>
+              <Select title="Category" value={category} onChange={(v) => { setCategory(v); markEdited(); }} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
             </Field>
             <Field label="Casualties" error={errors.count}>
               <input type="number" inputMode="numeric" min={1} max={50} className={clsx('input', errors.count && 'input-error')} value={patientCount} onChange={(e) => { setPatientCount(Number(e.target.value)); markEdited(); }} />
             </Field>
             <Field label="Location (Lagos)">
-              <select className="input" value={selectedLandmark} onChange={(e) => { setSelectedLandmark(Number(e.target.value)); markEdited(); }}>
-                {LAGOS_LANDMARKS.map((l, i) => <option key={l.name} value={i}>{l.name}</option>)}
-              </select>
+              <Select title="Incident location" value={String(selectedLandmark)} onChange={(v) => { setSelectedLandmark(Number(v)); markEdited(); }} options={LAGOS_LANDMARKS.map((l, i) => ({ value: String(i), label: l.name }))} />
             </Field>
           </div>
 
@@ -175,8 +171,8 @@ export const EmergencyIntakePage: React.FC<Props> = ({ onEmergencyCreated, onNav
             </Field>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="flex items-center gap-2 text-[12.5px] font-medium text-ink-400"><TriangleAlert className="size-4" />For a real emergency, also call your local emergency line.</p>
+          <div className="sticky bottom-[-14px] z-20 -mx-1 mt-2 flex flex-col gap-3 rounded-2xl border border-ink-100 bg-white/90 p-2.5 shadow-[var(--shadow-lift)] backdrop-blur-xl sm:static sm:mx-0 sm:mt-0 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:border-t sm:bg-transparent sm:p-0 sm:pt-5 sm:shadow-none sm:backdrop-blur-none">
+            <p className="hidden items-center gap-2 text-[12.5px] font-medium text-ink-400 sm:flex"><TriangleAlert className="size-4" />For a real emergency, also call your local emergency line.</p>
             <Button type="submit" variant="danger" size="lg" icon={Send} className="w-full sm:w-auto">Review & dispatch</Button>
           </div>
         </form>
@@ -194,9 +190,9 @@ export const EmergencyIntakePage: React.FC<Props> = ({ onEmergencyCreated, onNav
             <p className="mt-1 text-[13px] font-medium leading-relaxed text-ink-600">{description}</p>
           </div>
           <div className="divide-y divide-ink-100">
-            <KV label="Location"><span className="inline-flex items-center gap-1.5"><MapPin className="size-3.5 text-ink-400" />{loc.name}</span></KV>
+            <KV label="Location">{loc.name}</KV>
             {symptoms.trim() && <KV label="Symptoms">{symptoms}</KV>}
-            {callerPhone.trim() && <KV label="Responder"><span className="inline-flex items-center gap-1.5"><Phone className="size-3.5 text-ink-400" />{callerPhone}</span></KV>}
+            {callerPhone.trim() && <KV label="Responder">{callerPhone}</KV>}
           </div>
         </div>
       </Modal>
@@ -209,7 +205,11 @@ export const EmergencyIntakePage: React.FC<Props> = ({ onEmergencyCreated, onNav
         </>}>
         {created && (
           <div className="space-y-4">
-            <Alert tone="signal" icon={Zap} title="Matching in progress">ER-Sync is ranking hospitals and requesting a bed. You can follow every step live in the Command Center.</Alert>
+            {created.status === 'NO_MATCH' ? (
+              <Alert tone="warn" icon={TriangleAlert} title="No hospital meets every requirement yet">The case is logged. Open the Command Center to review the decision audit and retry dispatch as hospitals update their status.</Alert>
+            ) : (
+              <Alert tone="signal" icon={Zap} title="Matching in progress">ER-Sync is ranking hospitals and requesting a bed. You can follow every step live in the Command Center.</Alert>
+            )}
             <div className="flex flex-wrap gap-2">
               <Badge tone={severityTone(created.severity)} dot pulse={created.severity === 'CRITICAL'}>{titleCase(created.severity)} severity</Badge>
               <Badge tone="neutral"><Users className="size-3" />{created.patient_count} patient(s)</Badge>

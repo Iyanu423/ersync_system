@@ -7,7 +7,7 @@ import { clockTime } from '../utils/time';
 import { cleanName, emergencyStatusTone, lifecycleIndex, LIFECYCLE, relTime, severityTone, titleCase, referralTone } from '../utils/format';
 import { MapComponent } from '../components/MapComponent';
 import { useConfirm, useToast } from '../ui/UIProvider';
-import { Alert, Badge, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, Skeleton, StatCard } from '../ui/primitives';
+import { Alert, Badge, Button, Card, CardHeader, EmptyState, IconTile, PageHeader, ProgressBar, Skeleton, StatCard } from '../ui/primitives';
 import {
   Activity, AlertTriangle, Bed, Bell, Building2, Car, Check, CheckCircle2, Clock, Flame, HeartPulse, LogIn, MapPin,
   Radar, RefreshCw, ScrollText, ShieldAlert, Siren, Sliders, Stethoscope, Trophy, Zap,
@@ -180,9 +180,9 @@ export const GovernorCommandPage: React.FC<Props> = ({
         description="Every active case, referral and bed reservation across the network — updated every few seconds."
         actions={
           <>
-            <Button variant="secondary" icon={RefreshCw} loading={isLoading && loadedOnce} onClick={fetchData}>Refresh</Button>
+            <Button data-desktop-only variant="secondary" icon={RefreshCw} loading={isLoading && loadedOnce} onClick={fetchData}>Refresh</Button>
             {(currentRole === 'ADMIN' || currentRole === 'PATIENT') && (
-              <Button variant="danger" icon={Siren} onClick={() => onNavigate('intake')}>Report emergency</Button>
+              <Button data-desktop-only variant="danger" icon={Siren} onClick={() => onNavigate('intake')}>Report emergency</Button>
             )}
           </>
         }
@@ -191,7 +191,7 @@ export const GovernorCommandPage: React.FC<Props> = ({
       {loadError && <Alert tone="warn" icon={AlertTriangle}>{loadError}</Alert>}
 
       {/* KPI ribbon */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-6">
         <StatCard label="Hospitals online" icon={Building2} tone="signal" loading={!loadedOnce} value={<>{stats.hospitals_accepting}<span className="text-[16px] font-bold text-ink-300"> / {stats.total_hospitals}</span></>} />
         <StatCard label="Free beds" icon={Bed} tone="info" loading={!loadedOnce} value={<>{stats.available_beds}<span className="text-[16px] font-bold text-ink-300"> / {stats.total_beds}</span></>} />
         <StatCard label="Match speed" icon={Zap} tone="plum" loading={!loadedOnce} value={stats.average_matching_time_ms > 0 ? <>{Math.round(stats.average_matching_time_ms)}<span className="text-[16px] font-bold text-ink-300"> ms</span></> : '—'} />
@@ -223,7 +223,16 @@ export const GovernorCommandPage: React.FC<Props> = ({
 
                 {/* Lifecycle tracker */}
                 {!problem ? (
-                  <div className="mt-5 overflow-x-auto no-scrollbar">
+                  <>
+                  <div className="mt-5 sm:hidden">
+                    <div className="mb-2 flex items-baseline justify-between gap-3">
+                      <span className="text-[14px] font-extrabold text-ink-900">{LIFECYCLE[step]}</span>
+                      <span className="shrink-0 text-[12px] font-bold text-ink-400 tabnum">Step {step + 1} of {LIFECYCLE.length}</span>
+                    </div>
+                    <ProgressBar value={((step + 1) / LIFECYCLE.length) * 100} tone="signal" height={8} />
+                    {step < LIFECYCLE.length - 1 && <p className="mt-2 text-[12px] font-semibold text-ink-400">Next: {LIFECYCLE[step + 1]}</p>}
+                  </div>
+                  <div className="mt-5 hidden overflow-x-auto no-scrollbar sm:block">
                     <ol className="flex min-w-[560px] items-center">
                       {LIFECYCLE.map((label, i) => {
                         const done = i < step;
@@ -243,6 +252,7 @@ export const GovernorCommandPage: React.FC<Props> = ({
                       })}
                     </ol>
                   </div>
+                  </>
                 ) : (
                   liveEmergency.status === 'NO_MATCH' && (
                     <Alert tone="alert" icon={AlertTriangle} title="No eligible hospital right now" className="mt-5">
@@ -377,7 +387,7 @@ export const GovernorCommandPage: React.FC<Props> = ({
 
         {/* ───── Right ───── */}
         <div className="space-y-6 xl:col-span-5">
-          <MapComponent hospitals={hospitals} emergency={activeEmergency} selectedHospital={selectedHospital} height="340px" onSelectHospital={setSelectedHospital} />
+          <MapComponent hospitals={hospitals} emergency={activeEmergency} selectedHospital={selectedHospital} height="min(42vh, 340px)" onSelectHospital={setSelectedHospital} />
 
           <Card>
             <CardHeader icon={Clock} tone="neutral" title="Dispatch audit trail" subtitle="Latest system events"

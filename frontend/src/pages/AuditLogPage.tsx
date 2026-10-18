@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, ScrollText, Search, Braces } from 'lucide-react';
 import { ApiService } from '../services/api';
 import type { AuditEvent } from '../types';
-import { Badge, Button, Card, EmptyState, KV, Modal, PageHeader, Skeleton } from '../ui/primitives';
+import { Badge, Button, Card, EmptyState, KV, Modal, PageHeader, Select, Skeleton } from '../ui/primitives';
 import { cleanName, relTime, titleCase, type Tone } from '../utils/format';
 import { clockTime, parseUtc } from '../utils/time';
 
@@ -61,7 +61,7 @@ export const AuditLogPage: React.FC = () => {
         eyebrow="Accountability"
         title="Audit Trail"
         description="A chronological record of every automated decision and operator action — who did what, to what, and when."
-        actions={<Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={() => load(true)}>Refresh</Button>}
+        actions={<Button data-desktop-only variant="secondary" icon={RefreshCw} loading={refreshing} onClick={() => load(true)}>Refresh</Button>}
       />
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -69,10 +69,8 @@ export const AuditLogPage: React.FC = () => {
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-300" />
           <input className="input !h-10 !pl-10" placeholder="Search actor, action or entity" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select className="input !h-10 sm:!w-56" value={entity} onChange={(e) => setEntity(e.target.value)} aria-label="Filter by entity">
-          <option value="ALL">All entities ({events.length})</option>
-          {entities.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}
-        </select>
+        <Select className="sm:w-56 [&_.input]:!h-10" title="Filter by entity" value={entity} onChange={setEntity}
+          options={[{ value: 'ALL', label: `All entities (${events.length})` }, ...entities.map((t) => ({ value: t, label: titleCase(t) }))]} />
       </div>
 
       <Card pad={false} className="overflow-hidden">

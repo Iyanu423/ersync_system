@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, MapPin, Timer, XCircle, Users, ChevronRight, Shiel
 import type { Referral } from '../types';
 import { ApiService } from '../services/api';
 import { useToast } from '../ui/UIProvider';
-import { Badge, Button, Field, Modal } from '../ui/primitives';
+import { Badge, Button, Field, Modal, Select } from '../ui/primitives';
 import { cleanName, referralTone, relTime, severityTone, shortTime, titleCase } from '../utils/format';
 import { parseUtc } from '../utils/time';
 
@@ -111,9 +111,7 @@ export function useReferralResponder(onDone: () => void) {
               The case will automatically fail over to the next best hospital. Tell the network why you can't take this patient.
             </p>
             <Field label="Reason">
-              <select className="input" value={reason} onChange={(e) => setReason(e.target.value)}>
-                {REJECT_REASONS.map((r) => <option key={r}>{r}</option>)}
-              </select>
+              <Select title="Reason for declining" value={reason} onChange={setReason} options={REJECT_REASONS.map((r) => ({ value: r, label: r }))} />
             </Field>
           </>
         )}

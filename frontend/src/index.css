@@ -72,8 +72,8 @@
   --shadow-pop: 0 30px 70px -20px rgba(10, 20, 40, .45), 0 10px 24px -10px rgba(10, 20, 40, .25);
 
   --animate-fade-in: fade-in .18s ease-out both;
-  --animate-pop-in: pop-in .22s cubic-bezier(.16, 1, .3, 1) both;
-  --animate-sheet-up: sheet-up .3s cubic-bezier(.16, 1, .3, 1) both;
+  --animate-pop-in: pop-in .22s cubic-bezier(.16, 1, .3, 1) backwards;
+  --animate-sheet-up: sheet-up .34s cubic-bezier(.16, 1, .3, 1) backwards;
   --animate-toast-in: toast-in .32s cubic-bezier(.16, 1, .3, 1) both;
   --animate-rise: rise .45s cubic-bezier(.16, 1, .3, 1) both;
 }
@@ -115,6 +115,22 @@
   ::selection { background: var(--color-signal-600); color: #fff; }
   :focus-visible { outline: 2px solid var(--color-signal-500); outline-offset: 2px; }
   h1, h2, h3, h4 { letter-spacing: -0.015em; }
+  body { overflow-wrap: break-word; }
+  img { -webkit-user-drag: none; }
+  button, [role='button'], nav a { -webkit-touch-callout: none; touch-action: manipulation; }
+
+  /* Native-app ergonomics on touch screens */
+  @media (max-width: 1023px) {
+    /* 16px inputs stop iOS Safari zooming the page on focus */
+    .input, select.input, textarea.input { font-size: 16px; }
+    .btn { height: 46px; font-size: 14px; }
+    .btn-sm { height: 40px; font-size: 13px; }
+    .btn-lg { height: 52px; font-size: 15px; }
+    .btn-icon { width: 46px; }
+    .btn-icon.btn-sm { width: 40px; }
+    .segmented > button { height: 38px; }
+    .input-sm { height: 40px; }
+  }
 }
 
 @layer components {
@@ -250,6 +266,12 @@
 
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Phones auto-refresh and have a tab bar, so redundant header buttons are hidden there */
+  @media (max-width: 639px) {
+    [data-desktop-only] { display: none !important; }
+    .page-actions:not(:has(> :not([data-desktop-only]))) { display: none; }
+  }
 
   .pulse-red { animation: pulse-emergency 2s infinite; }
   .ping-soft { animation: ping-soft 1.8s cubic-bezier(0,0,.2,1) infinite; }

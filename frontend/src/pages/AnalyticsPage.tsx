@@ -77,13 +77,13 @@ export const AnalyticsPage: React.FC = () => {
         description="Dispatch speed, referral outcomes and capacity across every registered facility."
         actions={<>
           <span className="hidden text-[12px] font-semibold text-ink-400 sm:inline">Updated {lastRefreshed}</span>
-          <Button variant="secondary" icon={RefreshCw} loading={isLoading && loaded} onClick={fetchStats}>Refresh</Button>
+          <Button data-desktop-only variant="secondary" icon={RefreshCw} loading={isLoading && loaded} onClick={fetchStats}>Refresh</Button>
         </>}
       />
 
       {loadError && <Alert tone="warn" icon={TriangleAlert}>{loadError}</Alert>}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <StatCard label="Referral acceptance" icon={ShieldCheck} tone="signal" loading={!loaded} value={acceptance === null ? '—' : `${acceptance}%`}
           hint={<span className="inline-flex items-center gap-1.5"><TrendingUp className="size-3.5 text-signal-600" />{stats.referrals_accepted} accepted · {stats.referrals_rejected} declined</span>} />
         <StatCard label="Dispatch latency" icon={Clock} tone="info" loading={!loaded} value={stats.average_matching_time_ms > 0 ? <>{Math.round(stats.average_matching_time_ms)}<span className="text-[16px] font-bold text-ink-300"> ms</span></> : '—'} hint="Average Governor matching time" />

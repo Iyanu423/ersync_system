@@ -53,7 +53,7 @@ export const LoginPage: React.FC<{ onLoggedIn: (user: AuthUser) => void }> = ({ 
   };
 
   return (
-    <div className="flex min-h-dvh bg-canvas">
+    <div className="flex min-h-dvh overflow-x-hidden bg-canvas">
       {/* Brand panel */}
       <aside className="side-pattern relative hidden w-[46%] max-w-[640px] flex-col justify-between overflow-hidden bg-ink-950 p-12 text-white lg:flex">
         <svg className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 opacity-[.13]" viewBox="0 0 600 120" fill="none" preserveAspectRatio="none" height="120">
@@ -76,12 +76,12 @@ export const LoginPage: React.FC<{ onLoggedIn: (user: AuthUser) => void }> = ({ 
       </aside>
 
       {/* Form */}
-      <main className="pt-safe pb-safe flex flex-1 flex-col">
+      <main className="pt-safe pb-safe flex min-w-0 flex-1 flex-col">
         <div className="side-pattern relative bg-ink-950 px-6 pb-14 pt-10 text-white lg:hidden">
           <div className="flex items-center gap-3"><BrandMark size={42} /><div className="leading-tight"><p className="text-[20px] font-extrabold">ER-Sync</p><p className="text-[12px] font-medium text-ink-300/80">Emergency Coordination Network</p></div></div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-[460px] flex-1 flex-col justify-center px-5 py-8 lg:py-12">
+        <div className="mx-auto flex w-full min-w-0 max-w-[460px] flex-1 flex-col justify-center px-4 py-6 sm:px-5 lg:py-12">
           <div className="-mt-12 lg:mt-0">
             <div className="animate-rise card p-6 shadow-[var(--shadow-lift)] sm:p-8">
               <h2 className="text-[26px] font-extrabold tracking-tight text-ink-900">Sign in</h2>
@@ -135,7 +135,7 @@ export const LoginPage: React.FC<{ onLoggedIn: (user: AuthUser) => void }> = ({ 
                         <span className="block text-[13.5px] font-bold text-ink-900">{m.label}</span>
                         <span className="block truncate text-[12px] font-medium text-ink-500">{a.who} · {a.note}</span>
                       </span>
-                      <span className="shrink-0 text-right text-[11px] font-semibold leading-tight text-ink-400"><span className="block text-ink-700">{a.username}</span><span className="block">{a.password}</span></span>
+                      <span className="hidden shrink-0 text-right text-[11px] font-semibold leading-tight text-ink-400 min-[430px]:block"><span className="block text-ink-700">{a.username}</span><span className="block">{a.password}</span></span>
                     </button>
                   );
                 })}
